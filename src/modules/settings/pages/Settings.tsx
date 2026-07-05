@@ -1,5 +1,5 @@
 import { useTheme } from '@/app/providers/ThemeProvider'
-import { listOwnedRows } from '@/lib/cloud/firestoreRepo'
+import { listOwnedRows } from '@/lib/cloud/supabaseRepo'
 import { plannerGetAllHabitLogs, plannerGetAllHabits } from '@/lib/cloud/plannerRepo'
 import { trackerGetCategories, trackerGetEnabledRules, trackerGetAllActivities, trackerGetSessionsByDateRange } from '@/lib/cloud/trackerRepo'
 import { useI18n, useTranslations } from '@/i18n'

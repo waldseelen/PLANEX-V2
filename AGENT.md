@@ -29,12 +29,12 @@ ANALYZE=true npm run build
 
 | Alan | Deger |
 | --- | --- |
-| Proje adi | PLAN.EX |
+| Proje adi | PLAN.EX V2 (repo/Vercel: PLANEX-V2 / planex-v2, kod adi STEMA) |
 | Slogan | Plan. Execute. Be Expert. |
-| Tur | Public landing + Supabase auth + protected productivity app |
-| Gelisim durumu | Hibrit gecis asamasi — auth/router/onboarding/query layer/service layer tamam, ARCH-1/2/3 dogrulandi, TEST-1/2/3 tamamlandi, UI/UX denetimi + i18n tamamlik + PROD-2/PROD-3 dogrulamalari tamamlandi. |
-| Son oturum notu (2026-03-14) | Repo ici dogrulamalar tekrarlandi: `npm run typecheck`, `npm run test -- --run tests/rls/rlsSmoke.test.ts`, `npm run build` basarili. |
-| Konum | `C:\\Users\\bugra\\Projects\\PLAN-EX` |
+| Tur | Public landing + Supabase auth + protected productivity app + STEM AI ogrenme katmani |
+| Gelisim durumu | Supabase auth + planner/tracker cloud sync + learn/AI backend gercekten Supabase'e bagli (2026-07-05 oncesi Firestore/localStorage'a sessizce dusuyordu, artik degil). Google/GitHub OAuth provider'lari Supabase dashboard'da henuz etkinlestirilmedi. |
+| Son oturum notu (2026-07-05) | Firebase tamamen kaldirildi (paket + kod), yeni Supabase projesi (`xtkovwztuopzeqpazxur`) olusturuldu, tam sema + RLS uygulandi, authStore/plannerRepo/trackerRepo/api edge fonksiyonlari Supabase'e tasindi, Vercel'e deploy edildi (`planex-v2.vercel.app`). |
+| Konum | `C:\\Users\\HP\\DEV\\STEMA` (klasor adi henuz PLANEX-V2 olarak degistirilemedi — baska bir surec kilitliyor) |
 | Dev sunucu | `http://localhost:3000` |
 | Ana stack | React 18, TypeScript 5.7, Vite 6, Tailwind 3, Framer Motion 12, Supabase, Dexie, Zustand |
 

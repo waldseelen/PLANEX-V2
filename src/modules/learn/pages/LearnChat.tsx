@@ -2,9 +2,8 @@ import React, { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '@/modules/auth/store/authStore'
-import { listOwnedRows, upsertOwnedRow, deleteOwnedRows } from '@/lib/cloud/firestoreRepo'
-import { ref, uploadBytes } from 'firebase/storage'
-import { storage } from '@/config/firebase'
+import { listOwnedRows, upsertOwnedRow, deleteOwnedRows } from '@/lib/cloud/supabaseRepo'
+import { supabase } from '@/config/supabase'
 import { useLocale } from '@/i18n'
 import { 
   ArrowLeft, 
@@ -616,14 +615,14 @@ export function LearnChat() {
         throw new Error(isTr ? 'Dosyadan metin okunamadı veya dosya boş.' : 'No text could be extracted or the file is empty.')
       }
 
-      // 2. Upload file to Firebase Storage (optional / try-catch)
+      // 2. Upload file to Supabase Storage (optional / try-catch)
       setIngestProgress(isTr ? 'Ders notu kaydediliyor...' : 'Saving study material...')
-      const filePath = `documents/${user.id}/${Date.now()}_${file.name}`
-      
+      const filePath = `${user.id}/${Date.now()}_${file.name}`
+
       let uploadError = null
       try {
-        const fileRef = ref(storage, filePath)
-        await uploadBytes(fileRef, file)
+        const { error } = await supabase.storage.from('documents').upload(filePath, file, { contentType: file.type })
+        if (error) throw error
       } catch (err) {
         uploadError = err
       }

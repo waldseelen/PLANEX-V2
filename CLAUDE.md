@@ -22,6 +22,38 @@ npm run test:e2e
 ANALYZE=true npm run build
 ```
 
+## Migration Status (2026-07-05)
+
+Project was rebranded PLAN.EX V2 (repo/Vercel project renamed from STEMA/stema to
+PLANEX-V2/planex-v2; local folder rename is pending — see below). This file
+previously described a target Supabase architecture that the code did not
+actually implement: auth and all domain data ran on Firebase (Firestore +
+Firebase Auth), silently falling back to per-browser `localStorage` in
+production because no Firebase env vars were ever set. That has been fixed:
+
+- `firebase` package removed entirely (client, server, and `api/*` routes).
+- Real Supabase project provisioned (`xtkovwztuopzeqpazxur`), full schema in
+  `supabase/migrations/` (planner + tracker + learn/AI, all RLS-protected).
+- `authStore.ts` now uses real Supabase Auth (`supabase.auth.signInWithOAuth`),
+  not the previous Firebase Auth / always-logged-in mock user.
+- `src/lib/cloud/supabaseRepo.ts` replaces the old Firestore-backed
+  `firestoreRepo.ts` for planner/tracker/settings cloud sync.
+- `api/chat.ts`, `api/feynman.ts`, `api/documents/ingest.ts` use
+  `api/lib/supabaseEdge.ts` (service-role client + verified-JWT user lookup)
+  instead of the old unverified-JWT Firebase edge client.
+- RAG search uses a real pgvector `match_document_chunks` RPC instead of
+  fetching all chunks and computing cosine similarity in JS.
+- Google/GitHub OAuth providers still need to be enabled with real
+  credentials in the Supabase dashboard before login will work end-to-end.
+- Local folder is still named `STEMA` on disk (rename blocked by another
+  process holding a lock on it) even though the repo/Vercel project are
+  `PLANEX-V2`/`planex-v2` — rename it manually once nothing else has it open.
+
+Do not trust the "hybrid Dexie/Supabase" framing below as aspirational —
+domain data (planner/tracker) is still genuinely Dexie-first with Supabase as
+the sync target, exactly as described. What changed is that the Supabase side
+of that sync is now real, not silently broken.
+
 ## Product Snapshot
 
 PLAN.EX is in a hybrid SaaS transition. The current product shape is:

@@ -1,6 +1,6 @@
 {
     "$schema": "https://openapi.vercel.sh/vercel.json",
-    "name": "stema",
+    "name": "planex-v2",
     "version": 2,
     "framework": "vite",
     "buildCommand": "npm run build",

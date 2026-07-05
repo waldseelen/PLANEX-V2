@@ -2,17 +2,22 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "PLAN-EX Dev",
-      "runtimeExecutable": "node",
-      "runtimeArgs": ["C:\\Program Files\\nodejs\\node_modules\\npm\\bin\\npm-cli.js", "run", "dev"],
-      "port": 3000,
-      "autoPort": false
+      "name": "PLANEX V2 Dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
     },
     {
-      "name": "PLAN-EX Preview",
+      "name": "PLANEX V2 Preview",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "preview"],
       "port": 4173
+    },
+    {
+      "name": "PLANEX V2 Test UI",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "test:ui"],
+      "port": 51204
     }
   ]
 }

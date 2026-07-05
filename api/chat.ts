@@ -1,4 +1,4 @@
-import { db, collection, doc, getDoc, getDocs, query, where, limit, addDoc, getUserIdFromToken } from './lib/firebaseEdge'
+import { supabaseAdmin, getUserIdFromToken } from './lib/supabaseEdge'
 import { streamLLM, callLLM } from './lib/llmClient'
 import { calculateCost } from './lib/config'
 
@@ -45,20 +45,6 @@ interface ChatMessage {
   content: string
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0
-  let dotProduct = 0
-  let mA = 0
-  let mB = 0
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i]
-    mA += a[i] * a[i]
-    mB += b[i] * b[i]
-  }
-  if (mA === 0 || mB === 0) return 0
-  return dotProduct / (Math.sqrt(mA) * Math.sqrt(mB))
-}
-
 export default async function handler(req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
     return new Response('ok', {
@@ -95,7 +81,7 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     const authHeader = req.headers.get('Authorization') || req.headers.get('authorization')
-    const userId = getUserIdFromToken(authHeader)
+    const userId = await getUserIdFromToken(authHeader)
 
     const encoder = new TextEncoder()
     const { readable, writable } = new TransformStream()
@@ -116,17 +102,16 @@ export default async function handler(req: Request): Promise<Response> {
         let masteryScore: number | null = null
 
         // Fetch concept mastery
-        if (conceptId && userId && userId !== '00000000-0000-0000-0000-000000000000') {
+        if (conceptId && userId) {
           try {
-            const masterySnap = await getDocs(query(
-              collection(db, 'concept_mastery'),
-              where('user_id', '==', userId),
-              where('concept_id', '==', conceptId),
-              limit(1)
-            ))
-            if (!masterySnap.empty) {
-              const masteryData = masterySnap.docs[0].data()
-              masteryScore = Number(masteryData.score)
+            const { data: masteryRow } = await supabaseAdmin
+              .from('concept_mastery')
+              .select('score')
+              .eq('user_id', userId)
+              .eq('concept_id', conceptId)
+              .maybeSingle()
+            if (masteryRow) {
+              masteryScore = Number(masteryRow.score)
             }
           } catch (masteryErr) {
             console.error('Error fetching concept mastery:', masteryErr)
@@ -143,17 +128,16 @@ export default async function handler(req: Request): Promise<Response> {
           }
         }
 
-        // RAG: Fetch relevant document chunks
+        // RAG: Fetch relevant document chunks via pgvector cosine similarity
         const openrouterKey = process.env.OPENROUTER_API_KEY
-        if (openrouterKey && userId && userId !== '00000000-0000-0000-0000-000000000000') {
+        if (openrouterKey && userId) {
           try {
-            const docSnap = await getDocs(query(
-              collection(db, 'documents'),
-              where('user_id', '==', userId),
-              limit(1)
-            ))
+            const { count: docCount } = await supabaseAdmin
+              .from('documents')
+              .select('id', { count: 'exact', head: true })
+              .eq('user_id', userId)
 
-            if (!docSnap.empty) {
+            if (docCount && docCount > 0) {
               const embedResponse = await fetch('https://openrouter.ai/api/v1/embeddings', {
                 method: 'POST',
                 headers: {
@@ -171,23 +155,16 @@ export default async function handler(req: Request): Promise<Response> {
                 const queryEmbedding = embedData.data?.[0]?.embedding
 
                 if (queryEmbedding) {
-                  // Fetch all user document chunks for client-side cosine similarity search
-                  const chunksSnap = await getDocs(query(
-                    collection(db, 'document_chunks'),
-                    where('user_id', '==', userId)
-                  ))
+                  const { data: matchedChunks, error: matchError } = await supabaseAdmin.rpc('match_document_chunks', {
+                    query_embedding: queryEmbedding,
+                    match_user_id: userId,
+                    match_threshold: 0.35,
+                    match_count: 3,
+                  })
 
-                  const chunks = chunksSnap.docs.map(d => d.data())
-                  const matchedChunks = chunks
-                    .map((chunk: any) => ({
-                      ...chunk,
-                      similarity: cosineSimilarity(queryEmbedding, chunk.embedding)
-                    }))
-                    .filter(item => item.similarity >= 0.35)
-                    .sort((a, b) => b.similarity - a.similarity)
-                    .slice(0, 3)
-
-                  if (matchedChunks.length > 0) {
+                  if (matchError) {
+                    console.error('Error during RAG vector search:', matchError)
+                  } else if (matchedChunks && matchedChunks.length > 0) {
                     searchContext = matchedChunks
                       .map((chunk: any) => `[Kaynak: ${chunk.metadata?.page ? `Sayfa ${chunk.metadata.page}` : 'Ders Notu'}]\n${chunk.content}`)
                       .join('\n\n')
@@ -206,18 +183,17 @@ export default async function handler(req: Request): Promise<Response> {
 
         // Calculate response time
         let responseTimeMs = 0
-        if (activeSessionId && userId !== '00000000-0000-0000-0000-000000000000') {
+        if (activeSessionId && userId) {
           try {
-            const messagesSnap = await getDocs(query(
-              collection(db, 'messages'),
-              where('session_id', '==', activeSessionId)
-            ))
-            const assistantMsgs = messagesSnap.docs
-              .map(d => d.data())
-              .filter((m: any) => m.role === 'assistant')
-              .sort((a: any, b: any) => b.created_at.localeCompare(a.created_at))
+            const { data: lastAssistantMsg } = await supabaseAdmin
+              .from('learn_messages')
+              .select('created_at')
+              .eq('session_id', activeSessionId)
+              .eq('role', 'assistant')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle()
 
-            const lastAssistantMsg = assistantMsgs[0] || null
             if (lastAssistantMsg) {
               const lastTime = new Date(lastAssistantMsg.created_at).getTime()
               responseTimeMs = Date.now() - lastTime
@@ -228,8 +204,8 @@ export default async function handler(req: Request): Promise<Response> {
         }
 
         // Log user response event
-        if (activeSessionId && userId !== '00000000-0000-0000-0000-000000000000') {
-          void addDoc(collection(db, 'tutor_events'), {
+        if (activeSessionId && userId) {
+          void supabaseAdmin.from('tutor_events').insert({
             user_id: userId,
             event_type: 'user_response',
             payload: {
@@ -239,27 +215,31 @@ export default async function handler(req: Request): Promise<Response> {
               content_length: userMessage.length,
               timestamp: new Date().toISOString()
             },
-            created_at: new Date().toISOString()
-          }).catch(err => {
-            console.error('Error logging user_response tutor event:', err)
+          }).then(({ error }) => {
+            if (error) console.error('Error logging user_response tutor event:', error)
           })
         }
 
         // Create new session if not present
-        if (!activeSessionId && userId !== '00000000-0000-0000-0000-000000000000') {
+        if (!activeSessionId && userId) {
           try {
-            const sessionRef = await addDoc(collection(db, 'sessions'), {
-              user_id: userId,
-              title: userMessage.slice(0, 40) + (userMessage.length > 40 ? '...' : ''),
-              status: 'active',
-              created_at: new Date().toISOString()
-            })
-            activeSessionId = sessionRef.id
+            const { data: sessionRow, error: sessionErr } = await supabaseAdmin
+              .from('learn_sessions')
+              .insert({
+                user_id: userId,
+                topic: userMessage.slice(0, 40) + (userMessage.length > 40 ? '...' : ''),
+                status: 'active',
+              })
+              .select('id')
+              .single()
+
+            if (sessionErr) throw sessionErr
+            activeSessionId = sessionRow.id
 
             await writer.write(encoder.encode(`[SESSION_ID:${activeSessionId}]\n`))
 
             // Log session start event
-            void addDoc(collection(db, 'tutor_events'), {
+            void supabaseAdmin.from('tutor_events').insert({
               user_id: userId,
               event_type: 'session_start',
               payload: {
@@ -267,25 +247,23 @@ export default async function handler(req: Request): Promise<Response> {
                 concept_id: conceptId || null,
                 start_time: new Date().toISOString()
               },
-              created_at: new Date().toISOString()
-            }).catch(err => {
-              console.error('Error logging session_start tutor event:', err)
+            }).then(({ error }) => {
+              if (error) console.error('Error logging session_start tutor event:', error)
             })
           } catch (dbErr) {
-            console.error('Could not create session in Firestore:', dbErr)
+            console.error('Could not create session:', dbErr)
           }
         }
 
-        // Store user message in Firestore
-        if (activeSessionId && userId !== '00000000-0000-0000-0000-000000000000') {
-          void addDoc(collection(db, 'messages'), {
+        // Store user message
+        if (activeSessionId && userId) {
+          void supabaseAdmin.from('learn_messages').insert({
             user_id: userId,
             session_id: activeSessionId,
             role: 'user',
             content: userMessage,
-            created_at: new Date().toISOString()
-          }).catch(err => {
-            console.error('Error logging user message:', err)
+          }).then(({ error }) => {
+            if (error) console.error('Error logging user message:', error)
           })
         }
 
@@ -369,9 +347,9 @@ export default async function handler(req: Request): Promise<Response> {
           parsedHintLevel = parseInt(hintMatch[1], 10)
         }
 
-        // Log assistant message to Firestore
-        if (activeSessionId && userId !== '00000000-0000-0000-0000-000000000000') {
-          void addDoc(collection(db, 'messages'), {
+        // Log assistant message
+        if (activeSessionId && userId) {
+          void supabaseAdmin.from('learn_messages').insert({
             user_id: userId,
             session_id: activeSessionId,
             role: 'assistant',
@@ -390,14 +368,13 @@ export default async function handler(req: Request): Promise<Response> {
             prompt_tokens: promptTokensCount,
             completion_tokens: completionTokensCount,
             latency_ms: latencyMs,
-            created_at: new Date().toISOString()
-          }).catch(err => {
-            console.error('Error logging assistant message:', err)
+          }).then(({ error }) => {
+            if (error) console.error('Error logging assistant message:', error)
           })
 
           // Log hint shown
           if (parsedHintLevel > 0) {
-            void addDoc(collection(db, 'tutor_events'), {
+            void supabaseAdmin.from('tutor_events').insert({
               user_id: userId,
               event_type: 'hint_shown',
               payload: {
@@ -406,15 +383,14 @@ export default async function handler(req: Request): Promise<Response> {
                 hint_level: parsedHintLevel,
                 timestamp: new Date().toISOString()
               },
-              created_at: new Date().toISOString()
-            }).catch(err => {
-              console.error('Error logging hint_shown event:', err)
+            }).then(({ error }) => {
+              if (error) console.error('Error logging hint_shown event:', error)
             })
           }
 
           // Log socratic success
           if (parsedHintLevel === 0 && messages && messages.length > 0) {
-            void addDoc(collection(db, 'tutor_events'), {
+            void supabaseAdmin.from('tutor_events').insert({
               user_id: userId,
               event_type: 'socratic_success',
               payload: {
@@ -422,9 +398,8 @@ export default async function handler(req: Request): Promise<Response> {
                 concept_id: conceptId || null,
                 timestamp: new Date().toISOString()
               },
-              created_at: new Date().toISOString()
-            }).catch(err => {
-              console.error('Error logging socratic_success event:', err)
+            }).then(({ error }) => {
+              if (error) console.error('Error logging socratic_success event:', error)
             })
           }
 
@@ -436,15 +411,14 @@ export default async function handler(req: Request): Promise<Response> {
           }
 
           if (parsedErrorType) {
-            void addDoc(collection(db, 'error_logs'), {
+            void supabaseAdmin.from('error_logs').insert({
               user_id: userId,
               concept_id: conceptId || null,
               error_type: parsedErrorType,
               raw_user_answer: userMessage,
               model_feedback: completeResponse.replace(/\[HINT_LEVEL:\d\]|\[ERROR_TYPE:\w+\]/g, '').trim(),
-              created_at: new Date().toISOString()
-            }).catch(err => {
-              console.error('Error logging to error_logs:', err)
+            }).then(({ error }) => {
+              if (error) console.error('Error logging to error_logs:', error)
             })
 
             if (conceptId) {
@@ -506,8 +480,11 @@ async function generateAndSaveSRCard(
 ): Promise<void> {
   try {
     let conceptName = 'STEM Konusu'
-    const conceptDocSnap = await getDoc(doc(db, 'concepts', conceptId))
-    const conceptData = conceptDocSnap.exists() ? conceptDocSnap.data() : null
+    const { data: conceptData } = await supabaseAdmin
+      .from('concepts')
+      .select('name')
+      .eq('id', conceptId)
+      .maybeSingle()
 
     if (conceptData?.name) {
       conceptName = conceptData.name
@@ -551,7 +528,7 @@ Eğitmen Geri Bildirimi: ${modelFeedback}`
       console.error('Error during card generation API call:', apiErr)
     }
 
-    await addDoc(collection(db, 'sr_cards'), {
+    const { error: insertError } = await supabaseAdmin.from('sr_cards').insert({
       user_id: userId,
       concept_id: conceptId,
       front,
@@ -563,8 +540,9 @@ Eğitmen Geri Bildirimi: ${modelFeedback}`
       state: 0,
       reps: 0,
       lapses: 0,
-      created_at: new Date().toISOString()
     })
+
+    if (insertError) throw insertError
 
     console.log(`SR card generated and saved successfully for concept: ${conceptName}`)
   } catch (err) {

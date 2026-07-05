@@ -1,4 +1,4 @@
-import { db, collection, addDoc, getUserIdFromToken } from '../lib/firebaseEdge'
+import { supabaseAdmin, getUserIdFromToken } from '../lib/supabaseEdge'
 
 export const config = {
   runtime: 'edge',
@@ -39,7 +39,14 @@ export default async function handler(req: Request): Promise<Response> {
 
     // 1. Get User ID from JWT Token
     const authHeader = req.headers.get('Authorization') || req.headers.get('authorization')
-    const userId = getUserIdFromToken(authHeader)
+    const userId = await getUserIdFromToken(authHeader)
+
+    if (!userId) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers,
+      })
+    }
 
     // 2. Fetch Embeddings via OpenRouter
     const openrouterKey = process.env.OPENROUTER_API_KEY
@@ -93,20 +100,24 @@ export default async function handler(req: Request): Promise<Response> {
         .sort((a: any, b: any) => a.index - b.index)
         .map((item: any) => item.embedding)
 
-      // Write chunks to Firestore document_chunks collection
-      const colRef = collection(db, 'document_chunks')
-      await Promise.all(
-        currentBatch.map(async (chunk, idx) => {
-          await addDoc(colRef, {
-            document_id: documentId,
-            user_id: userId,
-            content: chunk.content,
-            embedding: sortedEmbeddings[idx],
-            metadata: chunk.metadata || {},
-            created_at: new Date().toISOString()
-          })
-        })
+      // Write chunks to the document_chunks table
+      const { error: insertError } = await supabaseAdmin.from('document_chunks').insert(
+        currentBatch.map((chunk, idx) => ({
+          document_id: documentId,
+          user_id: userId,
+          content: chunk.content,
+          embedding: sortedEmbeddings[idx],
+          metadata: chunk.metadata || {},
+        })),
       )
+
+      if (insertError) {
+        console.error('Error inserting document_chunks:', insertError)
+        return new Response(JSON.stringify({ error: 'Failed to store document chunks' }), {
+          status: 500,
+          headers,
+        })
+      }
 
       processedCount += currentBatch.length
     }

@@ -1,4 +1,4 @@
-import { db, collection, addDoc, getUserIdFromToken } from './lib/firebaseEdge'
+import { supabaseAdmin, getUserIdFromToken } from './lib/supabaseEdge'
 import { callLLM } from './lib/llmClient'
 
 export const config = {
@@ -65,7 +65,7 @@ export default async function handler(req: Request): Promise<Response> {
 
     // Initialize User ID
     const authHeader = req.headers.get('Authorization') || req.headers.get('authorization')
-    const userId = getUserIdFromToken(authHeader)
+    const userId = await getUserIdFromToken(authHeader)
 
     let evaluatedJSON: any = null
 
@@ -92,9 +92,9 @@ export default async function handler(req: Request): Promise<Response> {
       evaluatedJSON = getMockFeynmanEvaluation(conceptName, userExplanation)
     }
 
-    // Store in tutor_events on Firestore
-    if (userId !== '00000000-0000-0000-0000-000000000000') {
-      void addDoc(collection(db, 'tutor_events'), {
+    // Store in tutor_events
+    if (userId) {
+      void supabaseAdmin.from('tutor_events').insert({
         user_id: userId,
         event_type: 'feynman_evaluation',
         payload: {
@@ -105,9 +105,8 @@ export default async function handler(req: Request): Promise<Response> {
           mnemonic: evaluatedJSON.mnemonic,
           timestamp: new Date().toISOString()
         },
-        created_at: new Date().toISOString()
-      }).catch(err => {
-        console.error('Error logging feynman_evaluation event to Firestore:', err)
+      }).then(({ error }) => {
+        if (error) console.error('Error logging feynman_evaluation event:', error)
       })
     }
 

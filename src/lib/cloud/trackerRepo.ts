@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /**
- * Tracker Repository — Firebase Firestore
+ * Tracker Repository — Supabase
  *
- * Tracker domain için Firebase Firestore CRUD katmanı.
- * Tüm yazma/okuma işlemleri Firestore üzerinden yapılır.
+ * Tracker domain için Supabase Postgres CRUD katmanı.
+ * Tüm yazma/okuma işlemleri Supabase üzerinden yapılır.
  */
 
 import type {
@@ -31,7 +31,7 @@ import {
     upsertOwnedRow,
     deleteOwnedRows,
     updateOwnedRows,
-} from './firestoreRepo'
+} from './supabaseRepo'
 
 type SC = any
 

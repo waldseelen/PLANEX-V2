@@ -15,7 +15,7 @@ import ReactFlow, {
 import 'reactflow/dist/style.css'
 import { Excalidraw } from '@excalidraw/excalidraw'
 import '@excalidraw/excalidraw/index.css'
-import { listOwnedRows, upsertOwnedRow, deleteOwnedRows } from '@/lib/cloud/firestoreRepo'
+import { listOwnedRows, upsertOwnedRow, deleteOwnedRows } from '@/lib/cloud/supabaseRepo'
 import { useAuthStore } from '@/modules/auth/store/authStore'
 import { useLocale } from '@/i18n'
 import {

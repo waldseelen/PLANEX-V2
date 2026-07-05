@@ -103,7 +103,7 @@ export function buildProfileCompletionUpdate(input: ProfileCompletionInput) {
 }
 
 export function buildProfilePatch(updates: Partial<UserProfile>) {
-    const dbUpdates: Record<string, unknown> = {}
+    const dbUpdates: Database['public']['Tables']['profiles']['Update'] = {}
 
     if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName
     if (updates.avatarUrl !== undefined) dbUpdates.avatar_url = sanitizeRemoteImageUrl(updates.avatarUrl) ?? null
@@ -119,6 +119,29 @@ export function buildProfilePatch(updates: Partial<UserProfile>) {
 }
 
 export function resolveAuthState(snapshot: AuthBootstrapSnapshot): AuthResolution {
-    // Temporary bypass: Allow instant testing of application contents without authentication walls
+    if (!snapshot.authInitialized) {
+        return 'initializing'
+    }
+
+    if (snapshot.isLoading && !snapshot.isAuthenticated) {
+        return 'redirectPending'
+    }
+
+    if (!snapshot.isAuthenticated || !snapshot.user) {
+        return 'unauthenticated'
+    }
+
+    if (!snapshot.dataBootstrapReady) {
+        return 'bootstrapLoading'
+    }
+
+    if (!snapshot.profile) {
+        return 'profileLoading'
+    }
+
+    if (!snapshot.profile.profileCompleted) {
+        return 'requiresProfileCompletion'
+    }
+
     return 'authenticated'
 }

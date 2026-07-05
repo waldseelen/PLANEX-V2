@@ -5,7 +5,7 @@
  */
 
 import type { BackupData, ExportMetadata } from '@/db/time-tracking/types'
-import { listOwnedRows } from '@/lib/cloud/firestoreRepo'
+import { listOwnedRows } from '@/lib/cloud/supabaseRepo'
 import {
     trackerGetAllActivities,
     trackerGetAllGoals,

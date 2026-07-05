@@ -3,7 +3,7 @@ import {
     DEFAULT_POMODORO_CONFIG,
     DEFAULT_SETTINGS_DATA,
 } from '@/config/defaults'
-import { listOwnedRows, upsertOwnedRows } from './firestoreRepo'
+import { listOwnedRows, upsertOwnedRows } from './supabaseRepo'
 
 export async function ensureRemoteUserDefaults(): Promise<{
     seededCategories: boolean
