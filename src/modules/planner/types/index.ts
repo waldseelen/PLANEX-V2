@@ -187,13 +187,6 @@ export type BackupData = z.infer<typeof BackupDataSchema>;
 
 // ================== UI TYPES ==================
 
-export interface Toast {
-    id: string;
-    type: 'success' | 'error' | 'warning' | 'info';
-    message: string;
-    duration?: number;
-}
-
 export interface SearchResult {
     type: 'course' | 'unit' | 'task' | 'exam' | 'habit';
     id: string;
