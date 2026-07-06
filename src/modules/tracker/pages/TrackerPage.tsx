@@ -8,7 +8,8 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { ActivityGrid } from '../components/features/ActivityGrid'
 import { PomodoroTimer } from '../components/features/PomodoroTimer'
 import { RunningTimerBar } from '../components/features/RunningTimerBar'
-import { getCurrentSuggestion, type ActivitySuggestion } from '../lib/suggestionEngine'
+import { getCurrentSuggestion } from '../lib/suggestionEngine'
+import type { ActivitySuggestion } from '../types'
 
 export function TrackerPage() {
     const t = useTranslations(['common', 'tracker'])

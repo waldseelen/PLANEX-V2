@@ -10,16 +10,7 @@ import { useTranslations } from '@/i18n'
 import { clsx } from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import { Filter, RotateCcw } from 'lucide-react'
-
-// ============================================
-// Tipler
-// ============================================
-
-export interface RecordsFilterState {
-    activityIds: string[]
-    startDate: string   // YYYY-MM-DD
-    endDate: string     // YYYY-MM-DD
-}
+import type { RecordsFilterState } from '../../types'
 
 interface RecordsFilterProps {
     filter: RecordsFilterState

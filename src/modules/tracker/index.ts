@@ -22,14 +22,12 @@ export { TimerControls } from './components/ui/TimerControls'
 export { RecordEditModal } from './components/features/RecordEditModal'
 export { RecordItem } from './components/ui/RecordItem'
 export { RecordsFilter } from './components/features/RecordsFilter'
-export type { RecordsFilterState } from './components/features/RecordsFilter'
 export { RecordsGroupByDate } from './components/features/RecordsGroupByDate'
 
 // Components (Aşama 3)
 export { ActivityPieChart } from './components/features/ActivityPieChart'
 export { DailyBarChart } from './components/features/DailyBarChart'
 export { DateRangePicker } from './components/ui/DateRangePicker'
-export type { PeriodKey } from './components/ui/DateRangePicker'
 export { StatsSummaryCard } from './components/ui/StatsSummaryCard'
 
 // Components (Aşama 4)
@@ -51,7 +49,9 @@ export { pauseTimer, resumeTimer, startTimer, stopTimer } from './lib/timerServi
 // Business Logic (Aşama 6)
 export { fireRules, createRule, updateRule, deleteRule } from './lib/ruleEngine'
 export { getCurrentSuggestion, getHourlySuggestions } from './lib/suggestionEngine'
-export type { ActivitySuggestion } from './lib/suggestionEngine'
+
+// Domain types shared across pages/components/lib
+export type { ActivitySuggestion, PeriodKey, PomodoroPhase, RecordsFilterState } from './types'
 
 // Business Logic (Aşama 7)
 export {

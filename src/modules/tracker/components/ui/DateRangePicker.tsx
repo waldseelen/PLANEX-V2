@@ -1,7 +1,6 @@
 import { useTranslation } from '@/i18n'
 import { clsx } from 'clsx'
-
-export type PeriodKey = 'day' | 'week' | 'month' | 'year' | 'custom'
+import type { PeriodKey } from '../../types'
 
 interface DateRangePickerProps {
     startDate: string

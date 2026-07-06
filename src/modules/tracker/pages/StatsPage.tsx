@@ -6,9 +6,10 @@ import { useCallback, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ActivityPieChart } from '../components/features/ActivityPieChart'
 import { DailyBarChart } from '../components/features/DailyBarChart'
-import { DateRangePicker, getPeriodRange, type PeriodKey } from '../components/ui/DateRangePicker'
+import { DateRangePicker, getPeriodRange } from '../components/ui/DateRangePicker'
 import { StatsSummaryCard } from '../components/ui/StatsSummaryCard'
 import { TagValueBreakdown } from '../components/features/TagValueBreakdown'
+import type { PeriodKey } from '../types'
 
 export function StatsPage() {
     const t = useTranslations(['common', 'tracker'])

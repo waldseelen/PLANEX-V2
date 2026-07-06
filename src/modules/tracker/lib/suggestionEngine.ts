@@ -11,18 +11,7 @@ import {
     trackerGetAllActivities,
     trackerGetSessionsByDateRange,
 } from '@/lib/cloud/trackerRepo'
-
-// ============================================
-// Tipler
-// ============================================
-
-export interface ActivitySuggestion {
-    activityId: string
-    activityName: string
-    confidence: number    // 0-1 arası
-    hourOfDay: number     // 0-23
-    count: number         // Bu saatte kaç kez yapılmış
-}
+import type { ActivitySuggestion } from '../types'
 
 // ============================================
 // Analiz

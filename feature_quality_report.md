@@ -5,20 +5,44 @@ This report is concrete evidence for `PRODUCT_DIRECTION.md` step 1
 issues to work through before moving on to the STEM/planner integration
 bridge or any new STEM features.
 
-## 1. Folder and File Naming Consistency
-- **Intra-module organization:** the `tracker` and `planner` modules' UI
-  component organization is completely inconsistent. The `tracker` module
-  (Activity and Tracker components) dumps modals, charts, and forms flatly
-  into `src/modules/tracker/components/`. The `planner` module (Habit), by
-  contrast, properly organizes UI components into `components/features` and
-  `components/ui`. On top of that, the `tracker` module doesn't even have a
-  `types` folder.
-- **Database files:** Dexie.js configuration is inconsistent by directory.
-  `planner` has its own isolated, well-organized `src/db/planner` folder
-  (migrations, types.ts, database.ts included); time-tracking (`tracker`)
-  database files pollute the project's main `src/db/` directory
-  (`src/db/types.ts` and `src/db/migrations.ts` belong to time-tracking,
-  only the `queries` folder is in a subdirectory).
+## Status (2026-07-06)
+
+Items 2 and 3 below are resolved, via
+[PR #1](https://github.com/waldseelen/PLANEX-V2/pull/1) (merged
+2026-07-06): dead `plannerUIStore`/planner `Toast.tsx` removed,
+`plannerAppStore`/`trackerUIStore` trimmed to their actually-consumed
+fields, and all 6 tracker edit modals (`ActivityEditModal`,
+`CategoryEditModal`, `GoalEditModal`, `RecordEditModal`,
+`ReminderEditModal`, `TagEditModal`) migrated onto the single canonical
+`src/shared/components/Modal.tsx` instead of hand-rolled framer-motion
+dialogs. Typecheck clean, 319 tests passing (10 pre-existing
+network-dependent failures unrelated to this change).
+
+Item 1 is now resolved (re-checked 2026-07-06, see note below). Item 4
+(`RightPanel.tsx` God Component) is still open.
+
+## 1. Folder and File Naming Consistency — RESOLVED (re-checked 2026-07-06)
+On re-inspection this item was stale: `src/modules/tracker/components/`
+already mirrors planner's `components/features` + `components/ui` split,
+and `src/db/time-tracking/` is already its own isolated folder
+(`database.ts`, `migrations.ts`, `types.ts`, `queries/`) exactly like
+`src/db/planner/` — this was true since the module's original commit, so
+the original claim in this section was inaccurate rather than a regression.
+
+The one real gap found on re-check: `src/modules/tracker/types/` existed
+as an empty folder, while the module's actually-shared domain types
+(`RecordsFilterState`, `PeriodKey`, `ActivitySuggestion`, `PomodoroPhase`)
+were defined inline in the components/lib/store files that happened to
+use them first, instead of centralized like planner's
+`types/index.ts`. Fixed: those 4 types now live in
+`src/modules/tracker/types/index.ts`; all consumers (`RecordsPage`,
+`StatsPage`, `TrackerPage`, `PomodoroRuntime`, the module's `index.ts`
+barrel) import from there. `TrackerUIState` (the Zustand store's own
+`create<T>()` shape) was deliberately left in `trackerUIStore.ts`,
+matching the same convention already used by `plannerAppStore.ts`
+(`PlannerAppState`/`PlannerAppActions` stay local to the store file).
+Typecheck, build, and test suite (321 passing, same 10 pre-existing
+network-dependent failures) all verified clean after the move.
 
 ## 2. State Management (Zustand and Dexie.js)
 - **Zustand used for modals (major inconsistency):** both

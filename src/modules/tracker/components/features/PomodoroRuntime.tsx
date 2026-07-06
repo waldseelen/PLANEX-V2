@@ -2,7 +2,8 @@ import { useSettingsStore } from '@/modules/settings/store/settingsStore'
 import { useToast } from '@/shared/components/Toast'
 import { useCallback, useEffect } from 'react'
 import { savePomodoroSession } from '../../lib/timerService'
-import { type PomodoroPhase, usePomodoroStore } from '../../store/pomodoroStore'
+import { usePomodoroStore } from '../../store/pomodoroStore'
+import type { PomodoroPhase } from '../../types'
 
 function playBeep(enabled: boolean) {
     if (!enabled || typeof AudioContext === 'undefined') {

@@ -1,6 +1,5 @@
 import { create } from 'zustand'
-
-export type PomodoroPhase = 'work' | 'break'
+import type { PomodoroPhase } from '../types'
 
 interface PomodoroState {
     phase: PomodoroPhase
