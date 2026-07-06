@@ -2,10 +2,10 @@ import { useActiveActivities } from '@/db/time-tracking/queries/activityQueries'
 import { createGoal, deleteGoal, updateGoal } from '@/db/time-tracking/queries/goalQueries'
 import type { Goal, GoalScope } from '@/db/time-tracking/types'
 import { useTranslations } from '@/i18n'
+import { Modal } from '@/shared/components/Modal'
 import { useToast } from '@/shared/components/Toast'
 import { clsx } from 'clsx'
-import { AnimatePresence, motion } from 'framer-motion'
-import { Save, Trash2, X } from 'lucide-react'
+import { Save, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 
 interface GoalEditModalProps {
@@ -145,143 +145,118 @@ export function GoalEditModal({ goal, isOpen, onClose }: GoalEditModalProps) {
     }, [confirmDelete, goal, onClose, showToast, t])
 
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <>
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="modal-backdrop fixed inset-0 z-50"
-                        onClick={onClose}
+        <Modal
+            isOpen={isOpen}
+            onClose={onClose}
+            title={isEditing ? t('tracker', 'goal.edit') : t('tracker', 'goal.new')}
+            size="md"
+            footer={
+                <div className="flex items-center justify-between">
+                    {isEditing ? (
+                        <button
+                            type="button"
+                            onClick={handleDelete}
+                            className="btn-ghost gap-2 text-status-red"
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            {confirmDelete ? t('tracker', 'modal.confirmDelete') : t('common', 'common.delete')}
+                        </button>
+                    ) : (
+                        <div />
+                    )}
+
+                    <div className="flex items-center gap-2">
+                        <button type="button" onClick={onClose} className="btn-secondary">
+                            {t('common', 'common.cancel')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={saving || !form.name.trim()}
+                            className="btn-primary gap-2 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            <Save className="h-4 w-4" />
+                            {saving ? t('tracker', 'modal.saving') : t('common', 'common.save')}
+                        </button>
+                    </div>
+                </div>
+            }
+        >
+            <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                    <label className="form-label">{t('tracker', 'goal.name')}</label>
+                    <input
+                        type="text"
+                        value={form.name}
+                        onChange={event => setForm(current => ({ ...current, name: event.target.value }))}
+                        placeholder={t('tracker', 'goal.name')}
+                        className="input"
                     />
+                </div>
 
-                    <motion.div
-                        initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 16, scale: 0.98 }}
-                        transition={{ duration: 0.18 }}
-                        className="fixed inset-x-4 top-[10%] z-50 mx-auto max-w-md"
-                    >
-                        <div className="modal-content p-0">
-                            <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-5 py-4">
-                                <h2 className="text-base font-semibold text-text-primary">
-                                    {isEditing ? t('tracker', 'goal.edit') : t('tracker', 'goal.new')}
-                                </h2>
-                                <button type="button" onClick={onClose} className="btn-icon">
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-
-                            <div className="flex flex-col gap-4 px-5 py-5">
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="form-label">{t('tracker', 'goal.name')}</label>
-                                    <input
-                                        type="text"
-                                        value={form.name}
-                                        onChange={event => setForm(current => ({ ...current, name: event.target.value }))}
-                                        placeholder={t('tracker', 'goal.name')}
-                                        className="input"
-                                    />
-                                </div>
-
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="form-label">{t('tracker', 'goal.progress')}</label>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {scopes.map(scope => (
-                                            <button
-                                                key={scope.key}
-                                                type="button"
-                                                onClick={() => setForm(current => ({ ...current, scope: scope.key }))}
-                                                className={clsx(
-                                                    'rounded-md px-3 py-2 text-xs font-medium transition-colors',
-                                                    form.scope === scope.key
-                                                        ? 'bg-surface-300 text-text-primary'
-                                                        : 'bg-surface-100 text-text-secondary hover:bg-surface-200',
-                                                )}
-                                            >
-                                                {scope.label}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="form-label">{t('tracker', 'goal.targetTime')}</label>
-                                    <div className="grid grid-cols-[88px_1fr_88px_1fr] items-center gap-2">
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            max={24}
-                                            value={form.targetHours}
-                                            onChange={event => setForm(current => ({ ...current, targetHours: Number(event.target.value) }))}
-                                            className="input text-center"
-                                        />
-                                        <span className="text-xs text-text-muted">{t('tracker', 'time.hours')}</span>
-                                        <input
-                                            type="number"
-                                            min={0}
-                                            max={59}
-                                            value={form.targetMinutes}
-                                            onChange={event => setForm(current => ({ ...current, targetMinutes: Number(event.target.value) }))}
-                                            className="input text-center"
-                                        />
-                                        <span className="text-xs text-text-muted">{t('tracker', 'time.minutes')}</span>
-                                    </div>
-                                </div>
-
-                                <div className="flex flex-col gap-1.5">
-                                    <label className="form-label">
-                                        {t('tracker', 'activity.title')} {t('common', 'common.optional')}
-                                    </label>
-                                    <select
-                                        value={form.activityId}
-                                        onChange={event => setForm(current => ({ ...current, activityId: event.target.value }))}
-                                        className="input"
-                                    >
-                                        <option value="">{t('tracker', 'tag.allActivities')}</option>
-                                        {activities.map(activity => (
-                                            <option key={activity.id} value={activity.id}>
-                                                {activity.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center justify-between border-t border-[var(--border-subtle)] px-5 py-4">
-                                {isEditing ? (
-                                    <button
-                                        type="button"
-                                        onClick={handleDelete}
-                                        className="btn-ghost gap-2 text-status-red"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                        {confirmDelete ? t('tracker', 'modal.confirmDelete') : t('common', 'common.delete')}
-                                    </button>
-                                ) : (
-                                    <div />
+                <div className="flex flex-col gap-1.5">
+                    <label className="form-label">{t('tracker', 'goal.progress')}</label>
+                    <div className="grid grid-cols-2 gap-2">
+                        {scopes.map(scope => (
+                            <button
+                                key={scope.key}
+                                type="button"
+                                onClick={() => setForm(current => ({ ...current, scope: scope.key }))}
+                                className={clsx(
+                                    'rounded-md px-3 py-2 text-xs font-medium transition-colors',
+                                    form.scope === scope.key
+                                        ? 'bg-surface-300 text-text-primary'
+                                        : 'bg-surface-100 text-text-secondary hover:bg-surface-200',
                                 )}
+                            >
+                                {scope.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
 
-                                <div className="flex items-center gap-2">
-                                    <button type="button" onClick={onClose} className="btn-secondary">
-                                        {t('common', 'common.cancel')}
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={handleSave}
-                                        disabled={saving || !form.name.trim()}
-                                        className="btn-primary gap-2 disabled:cursor-not-allowed disabled:opacity-60"
-                                    >
-                                        <Save className="h-4 w-4" />
-                                        {saving ? t('tracker', 'modal.saving') : t('common', 'common.save')}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </motion.div>
-                </>
-            )}
-        </AnimatePresence>
+                <div className="flex flex-col gap-1.5">
+                    <label className="form-label">{t('tracker', 'goal.targetTime')}</label>
+                    <div className="grid grid-cols-[88px_1fr_88px_1fr] items-center gap-2">
+                        <input
+                            type="number"
+                            min={0}
+                            max={24}
+                            value={form.targetHours}
+                            onChange={event => setForm(current => ({ ...current, targetHours: Number(event.target.value) }))}
+                            className="input text-center"
+                        />
+                        <span className="text-xs text-text-muted">{t('tracker', 'time.hours')}</span>
+                        <input
+                            type="number"
+                            min={0}
+                            max={59}
+                            value={form.targetMinutes}
+                            onChange={event => setForm(current => ({ ...current, targetMinutes: Number(event.target.value) }))}
+                            className="input text-center"
+                        />
+                        <span className="text-xs text-text-muted">{t('tracker', 'time.minutes')}</span>
+                    </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                    <label className="form-label">
+                        {t('tracker', 'activity.title')} {t('common', 'common.optional')}
+                    </label>
+                    <select
+                        value={form.activityId}
+                        onChange={event => setForm(current => ({ ...current, activityId: event.target.value }))}
+                        className="input"
+                    >
+                        <option value="">{t('tracker', 'tag.allActivities')}</option>
+                        {activities.map(activity => (
+                            <option key={activity.id} value={activity.id}>
+                                {activity.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+        </Modal>
     )
 }

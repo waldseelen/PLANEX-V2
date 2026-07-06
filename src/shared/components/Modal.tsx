@@ -112,7 +112,14 @@ export const Modal = memo(function Modal({
         document.addEventListener('keydown', handleTabKey)
         document.body.style.overflow = 'hidden'
 
-        const raf = requestAnimationFrame(() => modalRef.current?.focus())
+        // Focus the dialog for keyboard users, but don't steal focus from an
+        // autoFocused field inside the modal.
+        const raf = requestAnimationFrame(() => {
+            const el = modalRef.current
+            if (el && !el.contains(document.activeElement)) {
+                el.focus()
+            }
+        })
 
         return () => {
             document.removeEventListener('keydown', handleEscape)
