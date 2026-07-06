@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { I18nProvider } from '../../src/i18n'
-import { ActivityEditModal } from '../../src/modules/tracker/components/ActivityEditModal'
+import { ActivityEditModal } from '../../src/modules/tracker/components/features/ActivityEditModal'
 import { ToastProvider } from '../../src/shared/components'
 
 const activityQueryMocks = vi.hoisted(() => ({

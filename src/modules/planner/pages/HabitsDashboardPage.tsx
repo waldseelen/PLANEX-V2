@@ -29,7 +29,7 @@ import { Button, IconButton } from '../components/ui/Button'
 import { Badge, Card, EmptyState, ProgressBar } from '../components/ui/Card'
 import { PlannerEntityIcon, PlannerIconField, PLANNER_DEFAULT_ICONS } from '../components/ui/PlannerIconField'
 import { Input, Select } from '../components/ui/Input'
-import { Modal } from '../components/ui/Modal'
+import { Modal } from '@/shared/components/Modal'
 import { cn } from '../lib/utils'
 import { HABIT_COLORS } from '../types'
 

@@ -1,58 +1,82 @@
 import { useTranslation } from '@/i18n'
-import { XMarkIcon } from '@heroicons/react/24/outline'
 import { clsx } from 'clsx'
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion'
+import { X } from 'lucide-react'
 import { memo, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 
 /**
- * Modal (Pop-up) Bileşeni
+ * Modal — the single canonical dialog for the whole app.
  *
- * Özellikler:
- * - ESC tuşu ile kapanma
- * - Dışına tıklayınca kapanma
- * - Tam responsive tasarım
- * - Focus trap (erişilebilirlik)
- * - Smooth animasyonlar
- * - Portal ile DOM'un dışında render
+ * Every module (planner + tracker + settings) renders through this one
+ * component so open/close transitions, positioning, focus handling and
+ * close affordances stay identical everywhere. Do not reimplement a modal
+ * shell with framer-motion + `.modal-backdrop` in a feature component;
+ * compose this instead (pass the form as children and the actions as
+ * `footer`).
+ *
+ * Behaviour:
+ * - Centered, portal-rendered above the app.
+ * - framer-motion enter/exit (0.18s standard easing), reduced-motion aware.
+ * - ESC + backdrop click to close (backdrop opt-out via disableOutsideClick).
+ * - Focus trap while open, focus restored to the trigger on close.
+ * - Body scroll locked while open.
  */
 
 interface ModalProps {
-    /** Modal'ın açık/kapalı durumu */
+    /** Whether the modal is visible */
     isOpen: boolean
-    /** Kapanış callback'i */
+    /** Close callback (ESC, backdrop, close button) */
     onClose: () => void
-    /** Modal başlığı (opsiyonel - başlıksız modal için) */
+    /** Optional header title */
     title?: string
-    /** Modal içeriği */
+    /** Optional header subtitle under the title */
+    subtitle?: string
+    /** Modal body */
     children: ReactNode
-    /** Modal boyutu */
+    /** Max-width preset */
     size?: 'sm' | 'md' | 'lg' | 'xl' | 'full'
-    /** Kapatma butonunu gizle */
-    hideCloseButton?: boolean
-    /** Dış tıklamayı devre dışı bırak */
-    disableOutsideClick?: boolean
-    /** Footer alanı (aksiyonlar için) */
+    /** Footer area for actions */
     footer?: ReactNode
-    /** Custom class ekleme */
+    /** Extra classes on the modal card */
     className?: string
+    /** Show the header close button (default true) */
+    showCloseButton?: boolean
+    /** Force-hide the header close button (takes precedence) */
+    hideCloseButton?: boolean
+    /** Disable closing when clicking the backdrop */
+    disableOutsideClick?: boolean
+}
+
+const sizeClasses = {
+    sm: 'max-w-sm',
+    md: 'max-w-md',
+    lg: 'max-w-lg',
+    xl: 'max-w-2xl',
+    full: 'max-w-4xl',
 }
 
 export const Modal = memo(function Modal({
     isOpen,
     onClose,
     title,
+    subtitle,
     children,
     size = 'md',
+    footer,
+    className,
+    showCloseButton = true,
     hideCloseButton = false,
     disableOutsideClick = false,
-    footer,
-    className
 }: ModalProps) {
     const tc = useTranslation('common')
+    const reduceMotion = useReducedMotion()
     const modalRef = useRef<HTMLDivElement>(null)
     const previousActiveElement = useRef<HTMLElement | null>(null)
 
-    // ESC tuşu ile kapanma
+    const closeButtonVisible = !hideCloseButton && showCloseButton
+
+    // ESC ile kapanma
     const handleEscape = useCallback((e: KeyboardEvent) => {
         if (e.key === 'Escape') {
             e.preventDefault()
@@ -60,128 +84,130 @@ export const Modal = memo(function Modal({
         }
     }, [onClose])
 
-    // Focus trap - Tab ile modal dışına çıkmayı engelle
+    // Focus trap — Tab ile modal dışına çıkmayı engelle
     const handleTabKey = useCallback((e: KeyboardEvent) => {
         if (e.key !== 'Tab' || !modalRef.current) return
 
         const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
             'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         )
+        if (focusableElements.length === 0) return
         const firstElement = focusableElements[0]
         const lastElement = focusableElements[focusableElements.length - 1]
 
         if (e.shiftKey && document.activeElement === firstElement) {
             e.preventDefault()
-            lastElement?.focus()
+            lastElement.focus()
         } else if (!e.shiftKey && document.activeElement === lastElement) {
             e.preventDefault()
-            firstElement?.focus()
+            firstElement.focus()
         }
     }, [])
 
     useEffect(() => {
-        if (isOpen) {
-            // Önceki aktif elementi kaydet
-            previousActiveElement.current = document.activeElement as HTMLElement
+        if (!isOpen) return
 
-            // Event listener'ları ekle
-            document.addEventListener('keydown', handleEscape)
-            document.addEventListener('keydown', handleTabKey)
+        previousActiveElement.current = document.activeElement as HTMLElement
+        document.addEventListener('keydown', handleEscape)
+        document.addEventListener('keydown', handleTabKey)
+        document.body.style.overflow = 'hidden'
 
-            // Body scroll'u engelle
-            document.body.style.overflow = 'hidden'
-
-            // Modal'a focus ver - anında
-            requestAnimationFrame(() => {
-                modalRef.current?.focus()
-            })
-        }
+        // Focus the dialog for keyboard users, but don't steal focus from an
+        // autoFocused field inside the modal.
+        const raf = requestAnimationFrame(() => {
+            const el = modalRef.current
+            if (el && !el.contains(document.activeElement)) {
+                el.focus()
+            }
+        })
 
         return () => {
             document.removeEventListener('keydown', handleEscape)
             document.removeEventListener('keydown', handleTabKey)
             document.body.style.overflow = ''
-
-            // Önceki elemente focus'u geri ver
+            cancelAnimationFrame(raf)
             previousActiveElement.current?.focus()
         }
     }, [isOpen, handleEscape, handleTabKey])
 
-    // Dışarı tıklama handler'ı
     const handleBackdropClick = (e: React.MouseEvent) => {
         if (!disableOutsideClick && e.target === e.currentTarget) {
             onClose()
         }
     }
 
-    if (!isOpen) return null
+    const cardEnter = reduceMotion
+        ? { opacity: 0 }
+        : { opacity: 0, scale: 0.97, y: 8 }
+    const cardVisible = { opacity: 1, scale: 1, y: 0 }
 
-    // Boyut sınıfları - responsive
-    const sizeClasses = {
-        sm: 'max-w-sm',
-        md: 'max-w-md',
-        lg: 'max-w-lg',
-        xl: 'max-w-2xl',
-        full: 'max-w-4xl'
-    }
-
-    const modalContent = (
-        <div
-            className="modal-backdrop"
-            onClick={handleBackdropClick}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={title ? 'modal-title' : undefined}
-        >
-            <div
-                ref={modalRef}
-                tabIndex={-1}
-                className={clsx(
-                    'modal-content',
-                    sizeClasses[size],
-                    'focus:outline-none',
-                    className
-                )}
-                onClick={(e) => e.stopPropagation()}
-            >
-                {/* Header - yalnızca başlık varsa veya kapatma butonu görünürse göster */}
-                {(title || !hideCloseButton) && (
-                    <div className="flex items-center justify-between mb-6">
-                        {title && (
-                            <h2
-                                id="modal-title"
-                                className="text-display-lg text-text-primary"
-                            >
-                                {title}
-                            </h2>
+    return createPortal(
+        <AnimatePresence>
+            {isOpen && (
+                <motion.div
+                    className="modal-backdrop"
+                    style={{ animation: 'none' }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+                    onClick={handleBackdropClick}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby={title ? 'modal-title' : undefined}
+                >
+                    <motion.div
+                        ref={modalRef}
+                        tabIndex={-1}
+                        className={clsx(
+                            'modal-content flex flex-col overflow-hidden p-0 focus:outline-none',
+                            sizeClasses[size],
+                            className
                         )}
-                        {!hideCloseButton && (
-                            <button
-                                onClick={onClose}
-                                className={clsx('btn-icon rounded-full border border-[var(--border-subtle)] bg-surface-100', !title && 'ml-auto')}
-                                aria-label={tc('common.close')}
-                            >
-                                <XMarkIcon className="w-5 h-5" />
-                            </button>
+                        style={{ animation: 'none' }}
+                        initial={cardEnter}
+                        animate={cardVisible}
+                        exit={cardEnter}
+                        transition={{ duration: 0.18, ease: [0.4, 0, 0.2, 1] }}
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {(title || closeButtonVisible) && (
+                            <div className="flex items-start justify-between gap-4 border-b border-[var(--border-subtle)] px-6 py-4 flex-shrink-0">
+                                <div className="min-w-0">
+                                    {title && (
+                                        <h2 id="modal-title" className="text-lg font-bold text-text-primary">
+                                            {title}
+                                        </h2>
+                                    )}
+                                    {subtitle && (
+                                        <p className="text-sm text-text-secondary mt-0.5">{subtitle}</p>
+                                    )}
+                                </div>
+                                {closeButtonVisible && (
+                                    <button
+                                        onClick={onClose}
+                                        className="btn-icon flex-shrink-0 rounded-lg"
+                                        aria-label={tc('common.close')}
+                                    >
+                                        <X className="w-5 h-5" />
+                                    </button>
+                                )}
+                            </div>
                         )}
-                    </div>
-                )}
 
-                {/* Content */}
-                <div className="modal-body">
-                    {children}
-                </div>
+                        <div className="modal-body flex-1 overflow-y-auto overscroll-contain px-6 py-5">
+                            {children}
+                        </div>
 
-                {/* Footer - varsa göster */}
-                {footer && (
-                    <div className="modal-footer mt-6 border-t border-[var(--border-subtle)] pt-4">
-                        {footer}
-                    </div>
-                )}
-            </div>
-        </div>
+                        {footer && (
+                            <div className="modal-footer border-t border-[var(--border-subtle)] px-6 py-4 flex-shrink-0">
+                                {footer}
+                            </div>
+                        )}
+                    </motion.div>
+                </motion.div>
+            )}
+        </AnimatePresence>,
+        document.body
     )
-
-    // Portal ile body'ye direkt render (z-index sorunlarını önler)
-    return createPortal(modalContent, document.body)
 })

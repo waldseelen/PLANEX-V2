@@ -29,7 +29,7 @@ import { Button, IconButton } from '../components/ui/Button'
 import { Badge, Card, EmptyState } from '../components/ui/Card'
 import { PlannerEntityIcon, PlannerIconField, PLANNER_DEFAULT_ICONS } from '../components/ui/PlannerIconField'
 import { Input, Select, Textarea } from '../components/ui/Input'
-import { Modal } from '../components/ui/Modal'
+import { Modal } from '@/shared/components/Modal'
 import { cn, formatDateDisplay } from '../lib/utils'
 
 const statusColors: Record<TaskStatus, string> = {

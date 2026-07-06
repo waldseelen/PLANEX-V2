@@ -18,7 +18,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Button, IconButton } from '../components/ui/Button';
 import { Card, CardHeader, EmptyState, ProgressRing } from '../components/ui/Card';
 import { Input } from '../components/ui/Input';
-import { Modal } from '../components/ui/Modal';
+import { Modal } from '@/shared/components/Modal';
 import { PLANNER_DEFAULT_ICONS, PlannerEntityIcon, PlannerIconField } from '../components/ui/PlannerIconField';
 import { cn, formatDateDisplay, getLastNDays } from '../lib/utils';
 
