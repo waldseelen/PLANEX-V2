@@ -62,7 +62,8 @@
         "statistics": "İstatistikler",
         "settings": "Ayarlar",
         "learn": "STEMA Öğrenme",
-        "learnChat": "Sokratik Sohbet"
+        "learnChat": "Sokratik Sohbet",
+        "learningGroup": "Öğrenme"
     },
     "app": {
         "mobileNavigation": "Mobil gezinme",

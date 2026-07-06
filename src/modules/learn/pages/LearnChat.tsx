@@ -191,7 +191,7 @@ export function LearnChat() {
 
   // Layout & Workbench States
   const [workbenchTab, setWorkbenchTab] = useState<'whiteboard' | 'flashcards' | 'notes' | 'concepts'>('whiteboard')
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [showScrollDown, setShowScrollDown] = useState(false)
   
   // Whiteboard drawing elements fed by the AI agent

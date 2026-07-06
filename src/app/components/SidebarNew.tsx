@@ -3,7 +3,7 @@ import { clsx } from 'clsx'
 import type { ComponentType } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { APP_NAV_ITEMS, isNavItemActive } from './navItems'
+import { APP_NAV_ITEMS, isNavItemActive, MAIN_SIDEBAR_SECTIONS } from './navItems'
 
 interface SidebarProps {
     collapsed?: boolean
@@ -14,7 +14,6 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
     const t = useTranslation('common')
     const { pathname } = useLocation()
 
-    const mainItems = APP_NAV_ITEMS.slice(0, -1)
     const settingsItem = APP_NAV_ITEMS[APP_NAV_ITEMS.length - 1]
 
     return (
@@ -56,17 +55,43 @@ export function Sidebar({ collapsed = false, onToggle }: SidebarProps) {
                     )}
 
                     <nav className="space-y-0.5" role="navigation" aria-label={t('app.mainNavigation')}>
-                        {mainItems.map(item => (
-                            <SidebarItem
-                                key={item.id}
-                                href={item.href}
-                                label={t(item.labelKey)}
-                                targetId={`nav-${item.id}`}
-                                collapsed={collapsed}
-                                active={isNavItemActive(pathname, item.href)}
-                                icon={item.icon}
-                            />
-                        ))}
+                        {MAIN_SIDEBAR_SECTIONS.map(section => {
+                            if (section.kind === 'item') {
+                                const item = section.item
+                                return (
+                                    <SidebarItem
+                                        key={item.id}
+                                        href={item.href}
+                                        label={t(item.labelKey)}
+                                        targetId={`nav-${item.id}`}
+                                        collapsed={collapsed}
+                                        active={isNavItemActive(pathname, item.href)}
+                                        icon={item.icon}
+                                    />
+                                )
+                            }
+
+                            return (
+                                <div key={section.labelKey} className="pt-2 first:pt-0">
+                                    {!collapsed && (
+                                        <p className="px-[10px] pb-1 pt-1 text-[0.6rem] font-semibold uppercase tracking-widest text-text-muted/70">
+                                            {t(section.labelKey)}
+                                        </p>
+                                    )}
+                                    {section.items.map(item => (
+                                        <SidebarItem
+                                            key={item.id}
+                                            href={item.href}
+                                            label={t(item.labelKey)}
+                                            targetId={`nav-${item.id}`}
+                                            collapsed={collapsed}
+                                            active={isNavItemActive(pathname, item.href)}
+                                            icon={item.icon}
+                                        />
+                                    ))}
+                                </div>
+                            )
+                        })}
                     </nav>
                 </div>
 

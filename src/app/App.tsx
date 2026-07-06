@@ -13,7 +13,6 @@ import { Suspense } from 'react'
 import { BrowserRouter, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import {
     LazyActivities,
-    LazyCalendar,
     LazyCategories,
     LazyCourseDetail,
     LazyCourses,
@@ -141,13 +140,8 @@ export function App() {
                                         } />
                                     </Route>
 
-                                    <Route path="calendar" element={
-                                        <PageErrorBoundary pageName={t('navigation.calendar')}>
-                                            <Suspense fallback={<LoadingFallback />}>
-                                                <LazyCalendar />
-                                            </Suspense>
-                                        </PageErrorBoundary>
-                                    } />
+                                    {/* Calendar is unified into the Planner (Tasks) page's "Takvim" view tab */}
+                                    <Route path="calendar" element={<Navigate to="/planner/tasks" replace />} />
                                     <Route path="tasks" element={<Navigate to="/planner/tasks" replace />} />
                                     <Route path="habits" element={
                                         <PageErrorBoundary pageName={t('navigation.habits')}>

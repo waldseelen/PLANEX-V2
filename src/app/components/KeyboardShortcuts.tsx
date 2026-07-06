@@ -1,5 +1,5 @@
 import { useTranslation } from '@/i18n'
-import { Modal } from '@/shared/components'
+import { isAnyModalOpen, Modal } from '@/shared/components'
 import { useEffect, useMemo, useState } from 'react'
 
 interface KeyboardShortcutsProps {
@@ -73,6 +73,10 @@ export function KeyboardShortcuts({
         }
 
         function handleKeyDown(event: KeyboardEvent) {
+            if (isAnyModalOpen()) {
+                return
+            }
+
             const inputFocused = isInputTarget(event.target)
 
             if (event.key === '?' && !event.ctrlKey && !event.metaKey && !inputFocused) {

@@ -56,6 +56,16 @@ const sizeClasses = {
     full: 'max-w-4xl',
 }
 
+// Tracks how many Modal instances are currently open, so global keydown
+// listeners (e.g. KeyboardShortcuts) can defer to a modal's own key handling
+// instead of firing navigation shortcuts while the user is typing inside one.
+// A counter, not a boolean, since more than one Modal can be open at once.
+let openModalCount = 0
+
+export function isAnyModalOpen(): boolean {
+    return openModalCount > 0
+}
+
 export const Modal = memo(function Modal({
     isOpen,
     onClose,
@@ -107,6 +117,7 @@ export const Modal = memo(function Modal({
     useEffect(() => {
         if (!isOpen) return
 
+        openModalCount += 1
         previousActiveElement.current = document.activeElement as HTMLElement
         document.addEventListener('keydown', handleEscape)
         document.addEventListener('keydown', handleTabKey)
@@ -122,6 +133,7 @@ export const Modal = memo(function Modal({
         })
 
         return () => {
+            openModalCount -= 1
             document.removeEventListener('keydown', handleEscape)
             document.removeEventListener('keydown', handleTabKey)
             document.body.style.overflow = ''

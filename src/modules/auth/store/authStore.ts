@@ -445,6 +445,50 @@ export const useAuthStore = create<AuthState>()(
 )
 
 /**
+ * TEMP DEV-ONLY BYPASS — remove once done testing.
+ * Signs in a real, dedicated dev/test Supabase account via signInWithPassword
+ * when VITE_DEV_BYPASS_AUTH=true in .env.local, instead of faking local auth
+ * state — a fake session has no real JWT, so Supabase RLS silently rejects
+ * every read/write. Requires VITE_DEV_BYPASS_EMAIL/VITE_DEV_BYPASS_PASSWORD
+ * for a pre-existing, already-confirmed-and-onboarded account. Only ever
+ * active in `npm run dev` (import.meta.env.DEV); never set in
+ * .env.production/.env.example, so it cannot reach a real build.
+ */
+const DEV_BYPASS_AUTH = import.meta.env.DEV && import.meta.env.VITE_DEV_BYPASS_AUTH === 'true'
+
+export function isDevAuthBypassActive() {
+  return DEV_BYPASS_AUTH
+}
+
+async function applyDevBypassSession() {
+  const email = import.meta.env.VITE_DEV_BYPASS_EMAIL as string | undefined
+  const password = import.meta.env.VITE_DEV_BYPASS_PASSWORD as string | undefined
+
+  if (!email || !password) {
+    console.error(
+      '[DEV_BYPASS_AUTH] VITE_DEV_BYPASS_EMAIL and VITE_DEV_BYPASS_PASSWORD must be set in ' +
+      '.env.local (a pre-existing, confirmed, onboarded dev/test Supabase account) for the ' +
+      'bypass to work — falling back to unauthenticated state instead of a fake session.'
+    )
+    setUnauthenticatedState()
+    return
+  }
+
+  try {
+    await useAuthStore.getState().signInWithEmail(email, password)
+    const { data, error } = await supabase.auth.getSession()
+    if (error) throw error
+    await applySession(data.session)
+  } catch (error) {
+    captureSecureException(error, {
+      context: 'AuthStore.devBypassSignIn',
+      category: 'network',
+    })
+    setUnauthenticatedState()
+  }
+}
+
+/**
  * Auth state listener — Supabase session değişikliklerini dinler.
  */
 let unsubscribeAuthListener: (() => void) | null = null
@@ -503,6 +547,11 @@ export async function ensureInitialAuthBootstrap() {
   authBootstrapPromise = (async () => {
     useAuthStore.getState().setLoading(true)
     try {
+      if (DEV_BYPASS_AUTH) {
+        await applyDevBypassSession()
+        return
+      }
+
       const { data, error } = await supabase.auth.getSession()
       if (error) throw error
       await applySession(data.session)

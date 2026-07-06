@@ -62,7 +62,8 @@
         "statistics": "Statistics",
         "settings": "Settings",
         "learn": "STEMA Learn",
-        "learnChat": "Socratic Chat"
+        "learnChat": "Socratic Chat",
+        "learningGroup": "Learning"
     },
     "app": {
         "mobileNavigation": "Mobile navigation",

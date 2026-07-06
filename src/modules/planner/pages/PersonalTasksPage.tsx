@@ -9,6 +9,7 @@ import { useTranslations } from '@/i18n'
 import { useToast } from '@/shared/components/Toast'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+    CalendarDays,
     CheckCircle,
     Circle,
     Clock,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react'
 import React, { useEffect, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { CalendarView } from '../components/features/CalendarView'
 import { ExternalSearchButtons } from '../components/features/ExternalSearchButtons'
 import { KanbanBoard } from '../components/features/KanbanBoard'
 import { TimelineView } from '../components/features/TimelineView'
@@ -74,7 +76,7 @@ export function PersonalTasksPage() {
 
     const personalTasks = usePersonalTasks()
 
-    const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'timeline'>('list')
+    const [viewMode, setViewMode] = useState<'list' | 'kanban' | 'timeline' | 'calendar'>('list')
     const [isAddModalOpen, setIsAddModalOpen] = useState(false)
     const [editingTask, setEditingTask] = useState<DBPersonalTask | null>(null)
     const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
@@ -261,13 +263,25 @@ export function PersonalTasksPage() {
                             onClick={() => setViewMode('timeline')}
                             className={cn(
                                 "flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all",
-                                viewMode === 'timeline' 
-                                    ? "bg-surface-50 text-text-primary shadow-sm" 
+                                viewMode === 'timeline'
+                                    ? "bg-surface-50 text-text-primary shadow-sm"
                                     : "text-text-muted hover:text-text-primary"
                             )}
                         >
                             <BarChart3 className="h-3.5 w-3.5" />
                             <span>Timeline</span>
+                        </button>
+                        <button
+                            onClick={() => setViewMode('calendar')}
+                            className={cn(
+                                "flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all",
+                                viewMode === 'calendar'
+                                    ? "bg-surface-50 text-text-primary shadow-sm"
+                                    : "text-text-muted hover:text-text-primary"
+                            )}
+                        >
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            <span>Takvim</span>
                         </button>
                     </div>
 
@@ -427,6 +441,9 @@ export function PersonalTasksPage() {
                     onSelectTask={openEditModal}
                 />
             )}
+
+            {/* Takvim Görünümü (etkinlikler + sınavlar) */}
+            {viewMode === 'calendar' && <CalendarView />}
 
             {/* Task Add / Edit Modal */}
             <Modal

@@ -90,9 +90,6 @@ export const Header = memo(function Header({ pageTitle }: HeaderProps) {
         if (location.pathname.startsWith('/habits')) {
             return t('navigation.habits')
         }
-        if (location.pathname.startsWith('/calendar')) {
-            return t('navigation.calendar')
-        }
         if (location.pathname.startsWith('/settings')) {
             return t('navigation.settings')
         }
@@ -108,8 +105,12 @@ export const Header = memo(function Header({ pageTitle }: HeaderProps) {
             <div className="mx-auto flex h-14 max-w-[var(--max-app-shell-width)] items-center gap-4 px-4 md:px-6">
                 <div className="min-w-0 shrink-0">
                     <div className="flex items-center gap-2 text-sm">
-                        <span className="truncate text-text-secondary">{breadcrumb}</span>
-                        <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
+                        {breadcrumb !== pageTitle && (
+                            <>
+                                <span className="truncate text-text-secondary">{breadcrumb}</span>
+                                <ChevronRight className="h-3.5 w-3.5 text-text-muted" />
+                            </>
+                        )}
                         <span className="truncate font-semibold text-text-primary">{pageTitle}</span>
                     </div>
                 </div>
