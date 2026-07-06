@@ -1,178 +1,205 @@
-# PLAN.EX
+# PLAN.EX V2
 
 **Plan. Execute. Be Expert.**
 
-PLAN.EX, ders ve is akisini tek yerde toplamak icin gelistirilen bir React + TypeScript uygulamasidir. Proje artik tam offline-first bir urun olarak degil, SaaS yonune gecen hibrit bir mimari olarak ilerliyor: Supabase auth, profil, onboarding durumu ve cloud bootstrap tarafinda aktif; planner ve tracker alan verileri ise halen Dexie tabanli local veritabani katmanlari uzerinde calisiyor.
+PLAN.EX is a React + TypeScript app built to bring a student's coursework and
+personal workflow together in one place. On top of that planner/tracker
+core, a second layer — the **STEMA** AI learning workspace (Socratic tutor,
+Feynman referee, FSRS spaced repetition, whiteboard, RAG over uploaded
+notes) — is integrated at `/learn`.
 
-## Guncel Durum
+See [`PRODUCT_DIRECTION.md`](PRODUCT_DIRECTION.md) for how these two layers
+relate and what's prioritized next.
 
-2026-03-12 itibariyla uygulamada sunlar canli:
+## Current Status (2026-07-05)
 
-- `/` rotasinda public landing
-- Google ve GitHub OAuth girisi
-- `/auth/callback` callback akisi
-- `/auth/profile-setup` zorunlu profil tamamlama
-- `/planner` icinde urun ustu 8 adimli onboarding overlay
-- `/settings/profile` icinde profil duzenleme, avatar yukleme ve onboarding restart
-- planner, calendar, habits, statistics, tracker ve settings icin protected route yapisi
-- Supabase tabanli local-to-cloud bootstrap ve cloud-first conflict mantigi
+- Public landing at `/`
+- Google and GitHub OAuth login, backed by real Supabase Auth
+- `/auth/callback` callback flow
+- `/auth/profile-setup` required profile completion
+- 8-step product-level onboarding overlay inside `/planner`
+- `/settings/profile` profile editing, avatar upload, and onboarding restart
+- Protected route structure for planner, calendar, habits, statistics, tracker, learn, and settings
+- Supabase-based local-to-cloud bootstrap and cloud-first conflict logic
+- `/learn`: Socratic chat, Feynman evaluation, FSRS flashcard review, whiteboard, mindmaps, and RAG over uploaded documents (all backed by Supabase + pgvector, via `api/chat.ts`, `api/feynman.ts`, `api/documents/ingest.ts`)
 
-Kritik not:
+Important:
 
-- `TASKS.md`, hedef mimaride alan verisinin tamamen Supabase'e tasinmasini tarif eder.
-- Kod tabani bugun buna tam ulasmis degildir.
-- Mevcut gercek: auth ve profil Supabase'te, core domain veri akisi ise hibrit bir durumda.
+- `TASKS.md` describes the target architecture where domain data moves fully onto Supabase.
+- The codebase hasn't fully reached that yet — planner/tracker UI still reads/writes Dexie directly, with Supabase as the sync target (see `ARCHITECTURE.md` section 7).
+- What changed on 2026-07-05: that sync target, and all of `/learn`'s backend, are now genuinely Supabase — previously they silently ran on Firebase, or fell back to per-browser `localStorage` when Firebase wasn't configured (which it never was in production). Firebase has been removed entirely from the codebase.
+- Google/GitHub OAuth providers and `SUPABASE_SERVICE_ROLE_KEY` still need to be configured in the Supabase dashboard / Vercel project for the deployed app to fully work end-to-end.
 
-## Teknoloji Yigini
+## Tech Stack
 
 - React 18
 - TypeScript 5.7
 - Vite 6
 - Tailwind CSS 3
 - Framer Motion 12
-- Supabase Auth / Database / Storage
+- Supabase Auth / Database / Storage (with pgvector for RAG)
 - Dexie + IndexedDB
 - Zustand
+- Vercel Edge Functions (`api/*`) for the AI/learn backend, via OpenRouter
 - Vitest
 - Playwright
 
-## Mimari Ozeti
+## Architecture Overview
 
-### Auth ve kullanici kimligi
+### Auth and user identity
 
-- Supabase Auth, giris katmanidir.
-- Aktif provider'lar yalnizca `google` ve `github`'dir.
-- Profil verisi `profiles` tablosunda tutulur.
-- Profil modeli; `full_name`, `occupation`, `student_status`, `school`, `department`, `grade`, `avatar_url`, `preferred_locale`, `preferred_theme`, `profile_completed` ve `onboarding_completed` alanlarini kapsar.
-- Giris sonrasi tema ve dil tercihleri profile geri senkronlanir.
+- Supabase Auth is the login layer.
+- Active providers are only `google` and `github`.
+- Profile data lives in the `profiles` table.
+- Profile model covers `full_name`, `occupation`, `student_status`, `school`, `department`, `grade`, `avatar_url`, `preferred_locale`, `preferred_theme`, `profile_completed`, and `onboarding_completed`.
+- Theme and language preferences sync back to the profile after login.
 
-### Domain veri katmani
+### Domain data layer
 
-- Planner ve tracker modulleri halen Dexie tabanli local veritabani katmanlari ile calisir.
-- `PlannerDatabase` planner verileri icin kullanilir.
-- `LifeFlowDB` tracker verileri icin kullanilir.
-- `CloudDataBootstrap`, Supabase aktif ve profil tamam ise local veriyi cloud'a tasima ya da cloud'dan local cache hydrate etme akisini yonetir.
-- Conflict durumunda cloud onceliklidir.
+- Planner and tracker modules still run primarily through Dexie local databases (`useLiveQuery`).
+- `PlannerDatabase` backs planner data.
+- `LifeFlowDB` backs tracker data.
+- `CloudDataBootstrap` handles moving local data to the cloud or hydrating local cache from the cloud once Supabase is active and the profile is complete.
+- Conflict policy is cloud-first.
 
-### UX yuzeyleri
+### Learn / STEM AI data layer
 
-- Public landing, profil kurulum ekrani ve protected app shell ayni tasarim dili uzerinde calisir.
-- Landing ekraninda tema ve dil kontrolleri ilk viewport icinde gorunur kalir.
-- Onboarding ayrica bir sayfa degil, urun ustunde calisan yonlendirme katmanidir.
-- Yeni auth yuzeyleri reduced motion ve screen reader davranislarini destekler.
+- `concepts`, `concept_mastery`, `learn_sessions`, `learn_messages`, `tutor_events`, `error_logs`, `sr_cards`, `documents`, `document_chunks`, and `mindmaps` all live in Supabase, RLS-protected per user.
+- Not yet linked to planner's `courses`/`units` — see `PRODUCT_DIRECTION.md` for the planned integration bridge.
+- Server-side AI calls (`api/chat.ts`, `api/feynman.ts`, `api/documents/ingest.ts`) use a service-role Supabase client (`api/lib/supabaseEdge.ts`) that verifies the bearer token against Supabase Auth rather than trusting a client-decoded JWT.
 
-## Baslangic
+### UX surfaces
 
-### Gereksinimler
+- Public landing, profile setup screen, and the protected app shell share one design language.
+- Theme and language controls stay visible in the landing's first viewport.
+- Onboarding is an in-product guidance layer, not a standalone page.
+- Auth surfaces support reduced-motion and screen-reader behavior.
+
+## Getting Started
+
+### Requirements
 
 - Node.js 18+
 - npm
-- OAuth icin bir Supabase projesi
+- A Supabase project (for OAuth, domain data, and the learn/AI backend)
+- An OpenRouter API key (for the learn/AI features)
 
-### Kurulum
+### Setup
 
 ```bash
 npm install
 ```
 
-`.env.example` dosyasini kopyalayip `.env.local` olarak duzenleyin. Lokal gelistirme icin en az su degerleri tanimlayin:
+Copy `.env.example` to `.env.local` and fill it in. At minimum for local development, set:
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
 - `VITE_ALLOWED_AUTH_ORIGINS`
+- `SUPABASE_SERVICE_ROLE_KEY` (needed for `/learn` chat/feynman/document-upload features to persist anything)
+- `OPENROUTER_API_KEY` (needed for `/learn` AI features to respond at all)
 
-Ardindan:
+Then apply the database schema (see `supabase/migrations/`) to your Supabase project, either via the Supabase Dashboard SQL editor or `supabase db push` after `supabase link`.
+
+Then:
 
 ```bash
 npm run dev
 ```
 
-Varsayilan development adresi: `http://localhost:3000`
+Default development address: `http://localhost:3000`
 
-Supabase OAuth icin lokal ayarlarda su origin ve callback adreslerini kullanin:
+For Supabase OAuth locally, use these origin/callback values:
 
 - Allowed origin: `http://localhost:3000`
 - Callback URL: `http://localhost:3000/auth/callback`
 
-Not:
+Notes:
 
-- `.env.example` icindeki callback/origin degerlerini kendi ortamiza gore guncelleyin.
-- Supabase env'leri eksikse landing acilir, ancak OAuth aksiyonlari disabled kalir.
+- Update the callback/origin values in `.env.example` to match your own environment.
+- If Supabase env vars are missing, the landing page still renders, but OAuth actions stay disabled.
+- Google and GitHub OAuth providers must be enabled with real credentials in the Supabase dashboard before login works end-to-end — a fresh Supabase project has neither enabled by default.
 
-## Ortam Degiskenleri
+## Environment Variables
 
-| Key | Gerekli | Amac |
+| Key | Required | Purpose |
 | --- | --- | --- |
-| `VITE_SUPABASE_URL` | Evet | Supabase proje URL'i |
-| `VITE_SUPABASE_ANON_KEY` | Evet | Supabase anon key |
-| `VITE_ALLOWED_AUTH_ORIGINS` | Onerilir | OAuth callback origin allowlist'i |
-| `VITE_ENABLE_SYNC` | Opsiyonel | Local-to-cloud bootstrap ve sync akisini acar |
-| `VITE_STRIPE_PUBLISHABLE_KEY` | Opsiyonel | Gelecekteki odeme yuzeyleri |
-| `VITE_ENABLE_GOOGLE_AUTH` | Opsiyonel | `false` verilirse Google provider kapanir |
-| `VITE_ENABLE_GITHUB_AUTH` | Opsiyonel | `false` verilirse GitHub provider kapanir |
+| `VITE_SUPABASE_URL` | Yes | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Yes | Supabase anon/publishable key |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes (for `/learn`) | Server-side key for `api/chat.ts`/`api/feynman.ts`/`api/documents/ingest.ts`; never expose with a `VITE_` prefix |
+| `OPENROUTER_API_KEY` | Yes (for `/learn`) | Model calls for Socratic chat, Feynman, mindmap, and OCR |
+| `VITE_ALLOWED_AUTH_ORIGINS` | Recommended | OAuth callback origin allowlist |
+| `VITE_ENABLE_SYNC` | Optional | Enables local-to-cloud bootstrap and sync flow |
+| `VITE_STRIPE_PUBLISHABLE_KEY` | Optional | Future payment surfaces |
+| `VITE_ENABLE_GOOGLE_AUTH` | Optional | Set `false` to disable the Google provider |
+| `VITE_ENABLE_GITHUB_AUTH` | Optional | Set `false` to disable the GitHub provider |
 
-## Komutlar
+## Commands
 
-| Komut | Aciklama |
+| Command | Description |
 | --- | --- |
-| `npm run dev` | Development sunucusunu baslatir |
+| `npm run dev` | Starts the development server |
 | `npm run build` | TypeScript build + Vite production build |
-| `npm run preview` | Production build onizlemesi |
-| `npm run lint` | ESLint calistirir |
-| `npm run typecheck` | TypeScript `noEmit` kontrolu |
-| `npm run test` | Vitest testleri |
+| `npm run preview` | Preview of the production build |
+| `npm run lint` | Runs ESLint |
+| `npm run typecheck` | TypeScript `noEmit` check |
+| `npm run test` | Vitest tests |
 | `npm run test:ui` | Vitest UI |
-| `npm run test:e2e` | Playwright E2E testleri |
-| `ANALYZE=true npm run build` | Bundle analyzer uretir |
+| `npm run test:e2e` | Playwright E2E tests |
+| `ANALYZE=true npm run build` | Produces a bundle analyzer report |
 
-## Route Haritasi
+## Route Map
 
-| Route | Aciklama |
+| Route | Description |
 | --- | --- |
-| `/` | Public landing + OAuth CTA'lari |
-| `/auth/callback` | OAuth callback sayfasi |
-| `/auth/profile-setup` | Ilk giris profil tamamlama |
-| `/planner` | Planner ana ekran |
-| `/planner/courses` | Ders listesi |
-| `/planner/courses/:courseId` | Ders detayi |
-| `/planner/tasks` | Kisisel gorevler |
-| `/planner/statistics` | Planner istatistikleri |
-| `/calendar` | Takvim |
+| `/` | Public landing + OAuth CTAs |
+| `/auth/callback` | OAuth callback page |
+| `/auth/profile-setup` | First-login profile completion |
+| `/planner` | Planner home |
+| `/planner/courses` | Course list |
+| `/planner/courses/:courseId` | Course detail |
+| `/planner/tasks` | Personal tasks |
+| `/planner/statistics` | Planner statistics |
+| `/calendar` | Calendar |
 | `/habits` | Habits dashboard |
-| `/habits/:habitId` | Habit detayi |
-| `/tracker` | Tracker ana ekran |
-| `/tracker/records` | Tracker kayitlari |
-| `/tracker/stats` | Tracker istatistikleri |
+| `/habits/:habitId` | Habit detail |
+| `/tracker` | Tracker home |
+| `/tracker/records` | Tracker records |
+| `/tracker/stats` | Tracker statistics |
 | `/tracker/goals` | Goals |
 | `/tracker/activities` | Activities |
 | `/tracker/categories` | Categories |
-| `/settings` | Genel ayarlar |
-| `/settings/profile` | Profil ayarlari |
+| `/learn` | STEM AI learning workspace (Socratic chat, Feynman, FSRS, whiteboard, documents) |
+| `/settings` | General settings |
+| `/settings/profile` | Profile settings |
 
-Legacy redirect'ler:
+Legacy redirects:
 
 - `/tasks` -> `/planner/tasks`
 - `/statistics` -> `/planner/statistics`
 
-## Dizin Ozeti
+## Folder Overview
 
 ```text
 src/
 ├── app/                 # Router, layout, providers
 ├── modules/
 │   ├── auth/            # Landing, callback, profile setup, onboarding, auth store
-│   ├── planner/         # Planner modulu
-│   ├── tracker/         # Time tracking modulu
+│   ├── planner/         # Planner module
+│   ├── tracker/         # Time tracking module
+│   ├── learn/           # STEM AI learning workspace
 │   └── settings/        # Settings + profile settings
-├── db/                  # Dexie tabanli local veri katmani
-├── i18n/                # TR / EN locale dosyalari
-├── shared/              # Ortak component, hook ve util'ler
-└── index.css            # Design tokens ve base styles
+├── db/                  # Dexie-based local data layer
+├── lib/cloud/           # Supabase-backed repo layer (supabaseRepo, plannerRepo, trackerRepo)
+├── i18n/                # TR / EN locale files
+├── shared/              # Shared components, hooks, utils
+└── index.css            # Design tokens and base styles
+api/                     # Vercel edge functions for the learn/AI backend (chat, feynman, ocr, mindmap, documents/ingest)
+supabase/migrations/     # Full Postgres schema + RLS for this project
 ```
 
-## Kalite ve Dogrulama
+## Quality and Verification
 
-Tavsiye edilen minimum kontrol:
+Recommended minimum check:
 
 ```bash
 npm run typecheck
@@ -180,19 +207,27 @@ npm run test
 npm run build
 ```
 
-Repo genelinde `npm run lint` calistirmadan once mevcut uyarilarin ve eski borclarin temiz olup olmadigini kontrol edin; proje gecis halinde oldugu icin tum branch'lerde tertemiz lint sonucu garanti olmayabilir.
+Before running `npm run lint` repo-wide, check whether existing warnings and
+older tech debt are clean; since the project is mid-transition, a fully
+clean lint result isn't guaranteed on every branch. See
+`feature_quality_report.md` for known planner/tracker UI-layer tech debt.
 
-## Diger Dokumanlar
+## Other Documents
 
-- `TASKS.md`: hedef SaaS mimarisi ve urun akisi
-- `AGENT.md`: proje kimligi, mimari gercek ve constraint'ler
-- `CLAUDE.md`: Claude Code odakli repo rehberi
+- `PRODUCT_DIRECTION.md`: agreed product priority order and why
+- `TASKS.md`: target SaaS architecture and product flow (some phase checkmarks predate the 2026-07-05 migration and should be cross-checked against the code)
+- `PROGRESS.md`: session-by-session progress log, including the 2026-07-05 correction notice
+- `ARCHITECTURE.md`: full system map — components, data flow, folder responsibilities, and where to change what
+- `AGENT.md`: project identity, architecture reality, and constraints
+- `CLAUDE.md`: Claude Code-focused repo guide
+- `feature_quality_report.md`: known tech debt in the planner/tracker UI layer
 
 ## Deployment
 
-- Framework: Vite
-- Build komutu: `npm run build`
-- Output dizini: `dist`
-- Hedef platform: Vercel
+- Framework: Vite (frontend) + Vercel Edge Functions (`api/*`)
+- Build command: `npm run build`
+- Output directory: `dist`
+- Target platform: Vercel
+- Repo: `waldseelen/PLANEX-V2` · Vercel project: `planex-v2` (`https://planex-v2.vercel.app`)
 
-PWA yapisi ve static asset optimizasyonlari `vite.config.ts` icinde tanimlidir.
+PWA structure and static asset optimizations are defined in `vite.config.ts`.

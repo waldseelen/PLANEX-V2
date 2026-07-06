@@ -1,20 +1,71 @@
 # STEMA Feature Quality Report: Activity, Habit, Tracker & Sidebar
 
-## 1. Klasör ve Dosya İsimlendirme Tutarlılığı
-- **Modül İçi Organizasyon:** `tracker` ve `planner` modüllerinin UI bileşen organizasyonu birbiriyle tamamen tutarsızdır. `tracker` modülü (Activity ve Tracker bileşenleri), modallar, chartlar ve formları düz bir şekilde `src/modules/tracker/components/` klasörüne yığmıştır. Buna karşın `planner` modülü (Habit), UI bileşenlerini `components/features` ve `components/ui` olarak düzgünce organize etmiştir. Ek olarak `tracker` modülünde tipleri barındıran bir `types` klasörü bile yoktur.
-- **Veritabanı Dosyaları:** Dexie.js yapılandırması dizin bazında tutarsızdır. `planner` kendine izole edilmiş, düzenli bir `src/db/planner` klasörü (migrations, types.ts, database.ts dahil) açmışken; time-tracking (`tracker`) veritabanı dosyaları projenin ana `src/db/` dizinini kirletmektedir (`src/db/types.ts` ve `src/db/migrations.ts` time-tracking'e aittir, sadece `queries` klasörü alt dizindedir).
+This report is concrete evidence for `PRODUCT_DIRECTION.md` step 1
+("solidify the primary planner/tracker core") — these are the specific
+issues to work through before moving on to the STEM/planner integration
+bridge or any new STEM features.
 
-## 2. State Yönetimi (Zustand ve Dexie.js)
-- **Modallar İçin Zustand Kullanımı (Büyük Tutarsızlık):** Hem `trackerUIStore.ts` hem de `plannerUIStore.ts`, açık modalları merkezi olarak yönetmek üzere tasarlanmıştır (örneğin `isEditModalOpen`, `activeModal`, vb.). Ancak kod incelendiğinde, geliştiricilerin bu merkezi Zustand store'larını kullanmak yerine React'in yerel hook'larına başvurduğu tespit edilmiştir (`HabitsDashboardPage.tsx` dosyasında `const [isAddModalOpen, setIsAddModalOpen] = useState(false)` kullanılması gibi). Bu durum, store'lardaki ilgili kodları atıl "Dead Code" (Ölü Kod) haline getirmiştir.
-- **Dexie.js ve Hook'lar:** Veritabanı entegrasyonu başarılıdır. `useHabits`, `useCourses`, `useActiveActivities` gibi özel hook'lar verileri reaktif olarak UI'a taşımakta ve tutarlı bir yapı sergilemektedir.
-- **Toast State Karışıklığı:** `plannerAppStore.ts` içerisinde Zustand ile yönetilen bir Toast (bildirim) sistemi varken, aynı zamanda Context API ile oluşturulmuş `src/shared/components/Toast.tsx` mevcuttur. İki farklı state yönetim mimarisi birbiriyle çakışmaktadır.
+## 1. Folder and File Naming Consistency
+- **Intra-module organization:** the `tracker` and `planner` modules' UI
+  component organization is completely inconsistent. The `tracker` module
+  (Activity and Tracker components) dumps modals, charts, and forms flatly
+  into `src/modules/tracker/components/`. The `planner` module (Habit), by
+  contrast, properly organizes UI components into `components/features` and
+  `components/ui`. On top of that, the `tracker` module doesn't even have a
+  `types` folder.
+- **Database files:** Dexie.js configuration is inconsistent by directory.
+  `planner` has its own isolated, well-organized `src/db/planner` folder
+  (migrations, types.ts, database.ts included); time-tracking (`tracker`)
+  database files pollute the project's main `src/db/` directory
+  (`src/db/types.ts` and `src/db/migrations.ts` belong to time-tracking,
+  only the `queries` folder is in a subdirectory).
 
-## 3. UI Bileşenlerinde Kod Tekrarları
-- **Modal Cehennemi (Code Duplication):** Sistemde 3 farklı Modal implementasyonu bulunmaktadır. Projenin genel `src/shared/components/Modal.tsx` bileşeni mevcuttur. Ancak Planner ekibi gidip bunu kopyalayarak `src/modules/planner/components/ui/Modal.tsx` dosyasını oluşturmuştur. Tracker ekibi ise daha da kötüsünü yaparak `ActivityEditModal.tsx` ve `GoalEditModal.tsx` dosyalarında bu bileşenlerin hiçbirini kullanmamış; `framer-motion` kullanarak backdrop'u, HTML div'lerini ve body-scroll lock fonksiyonlarını modalların kendi içine **sıfırdan tekrar** yazmıştır.
-- **Button ve Input Wrapper Eksikliği:** `planner` modülü buton ve input'ları `components/ui/Button.tsx` gibi wrapper'lar üzerinden kullanırken, `tracker` modülü bunları kullanmadan doğrudan HTML etiketlerine Tailwind sınıfları vererek (örn: `<input className="input" />`) kullanmaktadır.
-- **Toast Kopyaları:** Planner sayfaları kendi içlerindeki Toast bileşenini kullanmak yerine paylaşımlı (`shared`) Toast'u import etmeye başlamıştır, bu da Planner içindeki Toast kodunu gereksiz kod tekrarı haline getirmiştir.
+## 2. State Management (Zustand and Dexie.js)
+- **Zustand used for modals (major inconsistency):** both
+  `trackerUIStore.ts` and `plannerUIStore.ts` are designed to centrally
+  manage open modals (e.g. `isEditModalOpen`, `activeModal`, etc.). On
+  inspection, though, developers reached for React's local hooks instead of
+  using these central Zustand stores (e.g. `HabitsDashboardPage.tsx` uses
+  `const [isAddModalOpen, setIsAddModalOpen] = useState(false)`). This has
+  left the corresponding store code as dead code.
+- **Dexie.js and hooks:** database integration is solid here. Custom hooks
+  like `useHabits`, `useCourses`, `useActiveActivities` reactively feed data
+  to the UI and show a consistent pattern.
+- **Toast state confusion:** `plannerAppStore.ts` has a Zustand-managed
+  toast (notification) system, while a Context-API-based
+  `src/shared/components/Toast.tsx` also exists. Two different state
+  management architectures collide here.
 
-## 4. Geliştirilmesi veya Refactor Edilmesi Gereken "Code Smell" Noktaları
-- **God Component (`RightPanel.tsx`):** `src/app/components/RightPanel.tsx` dosyası tam 901 satır uzunluğunda bir devdir (God Component). Habits, Tracker Timers, Pomodoro, Courses, Tasks ve Deadlines olmak üzere projedeki hemen hemen her modülden veriyi tek dosyada çekip işlemektedir. En büyük kod kokularından biridir. Geliştiriciler bu dosyayı parçalamak için `src/app/components/RightPanelWidgets/` adında bir klasör açmışlar, fakat klasörün içi şu an **tamamen boş** bırakılmıştır.
-- **Sıkı Bağımlılık (Tight Coupling):** `RightPanel` ve `SidebarNew`, kendilerine parametre (`props`) olarak saf veri (pure data) almak yerine, veritabanı hook'larını (`useCourses`, `useTodayHabitsWithStatus`, vs.) doğrudan kendi içlerinde çağırmaktadır. Bu durum bileşenlerin test edilebilirliğini ve yeniden kullanılabilirliğini yok etmektedir.
-- **Kullanılmayan Kodların Temizlenmesi:** Zustand store'larındaki kullanılmayan modal state'lerinin, çift edilmiş Modal ve Toast dosyalarının acilen temizlenip `src/shared` dizinindekilere bağlanması (refactor edilmesi) gerekmektedir.
+## 3. Code Duplication in UI Components
+- **Modal hell (code duplication):** there are 3 separate Modal
+  implementations in the system. The project has a general
+  `src/shared/components/Modal.tsx` component. But the planner team copied
+  it to create `src/modules/planner/components/ui/Modal.tsx`. The tracker
+  team did worse: `ActivityEditModal.tsx` and `GoalEditModal.tsx` use
+  neither of these — they reimplement the backdrop, HTML divs, and
+  body-scroll-lock logic **from scratch** using `framer-motion` directly
+  inside the modal itself.
+- **Missing Button and Input wrappers:** the `planner` module uses buttons
+  and inputs through wrappers like `components/ui/Button.tsx`, while the
+  `tracker` module uses raw HTML tags with Tailwind classes directly
+  (e.g. `<input className="input" />`) without going through a wrapper.
+- **Toast duplicates:** planner pages have started importing the shared
+  (`shared`) Toast instead of using their own in-module Toast component,
+  which has left the planner's own Toast code as unnecessary duplication.
+
+## 4. Code Smells That Need Refactoring
+- **God Component (`RightPanel.tsx`):**
+  `src/app/components/RightPanel.tsx` is a full 901 lines long (a God
+  Component). It pulls and processes data from almost every module in the
+  project — Habits, Tracker Timers, Pomodoro, Courses, Tasks, and
+  Deadlines — in a single file. This is one of the biggest code smells in
+  the codebase. Developers opened a
+  `src/app/components/RightPanelWidgets/` folder to split this file apart,
+  but that folder is currently **completely empty**.
+- **Tight coupling:** `RightPanel` and `SidebarNew` call database hooks
+  (`useCourses`, `useTodayHabitsWithStatus`, etc.) directly inside
+  themselves instead of receiving pure data as props. This destroys the
+  testability and reusability of these components.
+- **Cleaning up unused code:** the unused modal state in the Zustand
+  stores, and the duplicated Modal and Toast files, urgently need to be
+  removed and wired back to the ones in `src/shared` (refactored).

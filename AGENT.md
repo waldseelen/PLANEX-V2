@@ -1,13 +1,16 @@
-# AGENT.md - Proje Kimligi, Kisitlar ve Gecis Gercegi
+# AGENT.md - Project Identity, Constraints, and Migration Reality
 
-Bu dosya, PLAN.EX icin iki farkli seyi ayni anda acik tutar:
+This file holds two different things open at once for PLAN.EX V2:
 
-1. `TASKS.md` dosyasinda tanimlanan hedef mimari
-2. Kod tabaninin bugun gercekte nasil calistigi
+1. The target architecture defined in `TASKS.md`
+2. How the codebase actually behaves today
 
-Bu ayrimi kaybetmeyin. Proje SaaS yonunde ilerliyor, fakat tam Supabase source-of-truth noktasina henuz gelmis degil. Bu dosya repo icin tek ajan rehberidir.
+Don't lose this distinction. See `PRODUCT_DIRECTION.md` for the agreed
+priority order (solidify the primary planner/tracker core first, then build
+the planner<->learn integration bridge, then focus STEM on a single loop).
+This file is the single agent guide for the repo.
 
-## Hizli Komutlar
+## Quick Commands
 
 ```bash
 # Development
@@ -25,181 +28,184 @@ npm run test:e2e
 ANALYZE=true npm run build
 ```
 
-## Proje Kimligi
+## Project Identity
 
-| Alan | Deger |
+| Field | Value |
 | --- | --- |
-| Proje adi | PLAN.EX V2 (repo/Vercel: PLANEX-V2 / planex-v2, kod adi STEMA) |
+| Project name | PLAN.EX V2 (repo/Vercel: PLANEX-V2 / planex-v2, codename STEMA) |
 | Slogan | Plan. Execute. Be Expert. |
-| Tur | Public landing + Supabase auth + protected productivity app + STEM AI ogrenme katmani |
-| Gelisim durumu | Supabase auth + planner/tracker cloud sync + learn/AI backend gercekten Supabase'e bagli (2026-07-05 oncesi Firestore/localStorage'a sessizce dusuyordu, artik degil). Google/GitHub OAuth provider'lari Supabase dashboard'da henuz etkinlestirilmedi. |
-| Son oturum notu (2026-07-05) | Firebase tamamen kaldirildi (paket + kod), yeni Supabase projesi (`xtkovwztuopzeqpazxur`) olusturuldu, tam sema + RLS uygulandi, authStore/plannerRepo/trackerRepo/api edge fonksiyonlari Supabase'e tasindi, Vercel'e deploy edildi (`planex-v2.vercel.app`). |
-| Konum | `C:\\Users\\HP\\DEV\\STEMA` (klasor adi henuz PLANEX-V2 olarak degistirilemedi — baska bir surec kilitliyor) |
-| Dev sunucu | `http://localhost:3000` |
-| Ana stack | React 18, TypeScript 5.7, Vite 6, Tailwind 3, Framer Motion 12, Supabase, Dexie, Zustand |
+| Type | Public landing + Supabase auth + protected productivity app + STEM AI learning layer |
+| Status | Auth, planner/tracker cloud sync, and the learn/AI backend are now genuinely wired to Supabase (before 2026-07-05 they silently fell back to Firestore/localStorage). Google/GitHub OAuth providers still need to be enabled in the Supabase dashboard. |
+| Last session note (2026-07-05) | Firebase removed entirely (package + code). New Supabase project (`xtkovwztuopzeqpazxur`) created, full schema + RLS applied, authStore/plannerRepo/trackerRepo/api edge functions moved to Supabase, deployed to Vercel (`planex-v2.vercel.app`). |
+| Location | `C:\Users\HP\DEV\STEMA` (folder rename to PLANEX-V2 is still pending — another process was holding a lock on it) |
+| Dev server | `http://localhost:3000` |
+| Main stack | React 18, TypeScript 5.7, Vite 6, Tailwind 3, Framer Motion 12, Supabase, Dexie, Zustand |
 
-## Proje Yapisi
+## Project Structure
 
 ```text
 src/
 ├── app/                    # App shell, router, providers
-│   ├── App.tsx             # Public ve protected route agaci
+│   ├── App.tsx             # Public and protected route tree
 │   ├── layouts/            # AppLayout
 │   └── providers/          # Theme, i18n sync, profile sync, cloud bootstrap
 ├── modules/
 │   ├── auth/               # Landing, callback, profile setup, onboarding
-│   ├── planner/            # Planner modulu
-│   ├── tracker/            # Time tracking modulu
-│   └── settings/           # Settings ve profile settings
-├── db/                     # Dexie tabanli local veri katmani
-├── i18n/                   # Translation dosyalari ve provider
-├── shared/                 # Shared component, hook ve util'ler
-└── index.css               # Design tokens ve base styling
+│   ├── planner/            # Planner module
+│   ├── tracker/            # Time tracking module
+│   ├── learn/              # STEM AI learning module (Socratic chat, Feynman, FSRS, whiteboard, mindmap)
+│   └── settings/           # Settings and profile settings
+├── db/                     # Dexie-based local data layer
+├── i18n/                   # Translation files and provider
+├── shared/                 # Shared components, hooks, utils
+└── index.css               # Design tokens and base styling
 ```
 
-## Kaynak Onceligi
+## Source Priority
 
-Asagidaki sirayi izleyin:
+Follow this order:
 
 1. `PROGRESS.md`
-   Hedefe gore bugun gercekte nereye gelindigini soyler.
+   Where things actually stand today relative to the target.
 2. `TASKS.md`
-   Hedef urun ve hedef mimari dokumanidir.
+   Target product and target architecture document. Some phase checkmarks
+   in it predate the 2026-07-05 migration and were aspirational rather than
+   real — cross-check against the code before trusting a "done" mark.
 3. `src/app/App.tsx`
-   Guncel route ve shell gercegidir.
+   Current route and shell reality.
 4. `src/modules/auth/store/authStore.ts`
-   Auth, profile completion, onboarding ve preference sync gercegidir.
+   Current auth, profile completion, onboarding, and preference-sync reality
+   — now backed by real Supabase Auth, not Firebase.
 5. `src/app/providers/CloudDataBootstrap.tsx`
-   Local-to-cloud bootstrap davranisinin bugunku gercegidir.
+   Current local-to-cloud bootstrap behavior.
 6. `src/lib/cloud/domainSync.ts`
-   Sync/hydration ve cloud-first conflict mantiginin bugunku gercegidir.
+   Current sync/hydration and cloud-first conflict logic.
 
-Kural:
+Rule:
 
-- Hedefi "tamamlanmis" gibi belgeleme.
-- Bugunku implementasyonu "tam Supabase gecildi" gibi anlatma.
-- Her zaman current state ile target state arasina cizgi cek.
+- Don't document the target as "done."
+- Don't describe today's implementation as "fully migrated" unless it is.
+- Always draw a clear line between current state and target state.
 
-## Bugunku Uygulama Durumu
+## Today's Implementation Status
 
-2026-03-13 itibariyla canli olanlar:
+As of 2026-07-05:
 
-- `/` rotasinda public landing
-- landing hero'sunda tek OAuth CTA yuzeyi, sessiz premium OAuth buttonlari, solid panel dili ve footer sign-off
-- Google ve GitHub OAuth
+- Public landing at `/`
+- Single OAuth CTA surface on the landing hero, quiet premium OAuth buttons, solid panel language, footer sign-off
+- Google and GitHub OAuth, now backed by real Supabase Auth (`supabase.auth.signInWithOAuth`) — the previous Firebase Auth / always-logged-in mock user is gone
 - `/auth/callback` callback processing
-- kanonik `/auth/profile-completion` ve uyumluluk alias'i `/auth/profile-setup`
-- render oncesi auth bootstrap
-- `App.tsx` icinde public ve protected route katmanlari
-- `AppLayout` yalnizca authenticated shell
-- `/settings/profile` profil duzenleme ve avatar upload
-- `/planner` uzerinde 8 adimli onboarding overlay
-- Auth state ekranlari: initial loading, redirect pending, profile loading, bootstrap loading
-- Theme ve locale tercihlerinin profile sync edilmesi; explicit kullanici secimi profile hydrate sonrasi geri ezilmez
-- Local veri bulunursa cloud bootstrap/import prompt'u
-- yeni authenticated kullanicilar icin remote default seed akisi
-- settings ve pomodoro icin remote runtime tablo temeli
-- tracker aktivite modalinda lokalize Lucide ikon katalogu, ikon arama ve sablondan baslama akisi
-- planner modallarinda ders, ders gorevi, kisisel gorev ve aliskanlik icin kalici Lucide ikon secimi; create/update/delete akislarinda await-temelli success/error toast sertlestirmesi
+- Canonical `/auth/profile-completion` and compatibility alias `/auth/profile-setup`
+- Auth bootstrap before render, via a real `supabase.auth.getSession()` call
+- Public and protected route layers in `App.tsx`
+- `AppLayout` as the authenticated-only shell
+- `/settings/profile` profile editing and avatar upload (now via Supabase Storage, not Firebase Storage)
+- 8-step onboarding overlay on `/planner`
+- Auth state screens: initial loading, redirect pending, profile loading, bootstrap loading
+- Theme and locale preferences sync to profile; explicit user choice isn't overwritten by profile hydration afterward
+- Cloud bootstrap/import prompt when local data exists
+- Remote default seed flow for newly authenticated users
+- Remote runtime table foundation for settings and pomodoro
+- Localized Lucide icon catalog, icon search, and template-start flow in the tracker activity modal
+- Persisted Lucide icon selection for course/task/personal-task/habit planner modals; await-based success/error toast hardening on create/update/delete flows
 
-Halen gecis asamasinda olanlar:
+Still hybrid:
 
-- Planner ve tracker query layer ve service layer artik Supabase-first; `PlannerDatabase` ve `LifeFlowDB` Dexie veritabanlari cloud bootstrap hydration ve backup cache icin ayakta.
-- `CloudDataBootstrap.tsx` hibrit akisti yonetiyor; query ve service layer Supabase-first olduktan sonra sadeleştirilebilir.
-- `domainSync.ts` icindeki `syncDomainTables` artik no-op shim; `hydrateLocalCacheFromCloud`, `getDomainSyncSummary` ve `clearLocalDomainCaches` aktif. `rules`, `reminders`, `completionRecords` tablolari da eklendi.
-- Tracker servisleri (`timerService.ts`, `ruleEngine.ts`, `suggestionEngine.ts`, `exportService.ts`) Supabase-first olarak yeniden yazildi.
-- `backupService.ts` authenticated kullanicida Supabase-first export yapiyor; Dexie fallback korunuyor.
-- Tam Supabase source-of-truth mimarisi, `TASKS.md` hedefidir; query layer, repo katmani ve service layer artik tamamen oraya getirildi.
+- Planner and tracker domain records still run through Dexie local databases (`PlannerDatabase`, `LifeFlowDB`); the cloud side of that sync (`plannerRepo.ts` / `trackerRepo.ts` via `supabaseRepo.ts`) is now genuinely Supabase, not Firestore or a silent localStorage fallback.
+- `CloudDataBootstrap.tsx` manages this hybrid flow.
+- `domainSync.ts` provides `hydrateLocalCacheFromCloud`, `getDomainSyncSummary`, and `clearLocalDomainCaches`.
+- The full "Supabase as sole source of truth" architecture in `TASKS.md` is the target; the repo/service layer now points at a real backend, but the Dexie-first UI read pattern hasn't been removed.
+- The `learn` module's `concepts`/`learn_sessions` are not yet linked to planner's `courses`/`units` — see `PRODUCT_DIRECTION.md` for why this is the next planned integration step, after the primary core is solidified.
 
-## Mimari Kararlar
+## Architecture Decisions
 
 ### 1. Public surface
 
-- `/` artik landing ekranidir; eski "dogrudan planner" varsayimi gecerli degil.
-- Landing screenshot degil, metin + feature card odakli olmalidir.
-- Hero icinde tema ve dil kontrolleri gorunur kalmalidir.
-- Header theme toggle system/light/dark etiketlerini aciga vurmaz; icon-only binary light/dark override gibi davranir. `system` secenegi settings icinde kalir.
-- Google ve GitHub CTA'lari esit hiyerarsiyle gosterilmelidir.
+- `/` is the landing screen now; the old "goes straight to planner" assumption no longer applies.
+- Landing should be text + feature-card driven, not screenshot-heavy.
+- Theme and language controls stay visible in the hero.
+- The header theme toggle doesn't expose system/light/dark labels; it behaves as an icon-only binary light/dark override. The `system` option stays in settings.
+- Google and GitHub CTAs must be shown with equal hierarchy.
 
-### 2. Auth ve profil
+### 2. Auth and profile
 
-- Auth provider'lari yalnizca `google` ve `github`'dir.
-- Email/password akisi eklemeyin; acik istek olmadikca genisletmeyin.
-- `full_name`, `occupation`, `student_status` temel zorunlu profil alanlaridir.
-- `student_status` `student` veya `both` ise `school` ve `department` alanlari gerekli hale gelir.
-- Avatar yukleme zorunlu degildir; provider avatari preview edilebilir, kullanici daha sonra degistirebilir.
+- Auth providers are only `google` and `github`.
+- Don't add an email/password flow; don't expand it without an explicit request.
+- `full_name`, `occupation`, `student_status` are the core required profile fields.
+- If `student_status` is `student` or `both`, `school` and `department` become required.
+- Avatar upload isn't required; the provider avatar can be previewed and the user can change it later.
 
 ### 3. Onboarding
 
-- Onboarding ayri bir sayfa degil, urun ustu overlay'dir.
-- Hedef akis 8 adimdir.
-- `skip` gorunur ve erisilebilir kalmalidir.
-- Ayarlardan yeniden baslatilabilmelidir.
-- Hedef element bulunamazsa guvenli fallback gerekir.
-- Route degisirse akis guvenli sekilde kapanmali veya dogru hedefte devam etmelidir.
+- Onboarding is an in-product overlay, not a standalone page.
+- The target flow is 8 steps.
+- `skip` must stay visible and accessible.
+- Must be restartable from settings.
+- Needs a safe fallback if the target element isn't found.
+- On route change, the flow must close safely or continue at the correct target.
 
-### 4. Veri katmani
+### 4. Data layer
 
-- Auth/profile icin Supabase ana kaynaktir.
-- Settings ve pomodoro default bootstrap icin remote runtime tablolar eklendi.
-- Planner ve tracker query layer artik Supabase-first (`plannerRepo` + `trackerRepo` uzerinden calisiyor).
-- Tracker service layer (`timerService`, `ruleEngine`, `suggestionEngine`, `exportService`) artik Supabase-first.
-- `trackerRepo.ts` Rule ve Reminder CRUD fonksiyonlari da iceriyor.
-- Tum query dosyalari (`src/db/**/queries/**`) `useSupabaseQuery` + repo fonksiyonlarini kullaniyor; `useLiveQuery` ve `syncDomainTables` kaldirildi.
-- Cloud sync tarafinda conflict kuralı cloud-first'tur.
-- Local cache ownership mantigi korunmalidir; kullanici degisince eski owner verisi karismamali.
-- Yeni cloud tablo tasarimlarinda `user_id` ve RLS dusuncesi baslangictan itibaren korunmalidir.
-- `PlannerDatabase` ve `LifeFlowDB` Dexie schema'lari halen ayakta; cloud bootstrap hydration icin kullanilmakta.
+- Supabase is the primary source for auth/profile.
+- Remote runtime tables exist for settings and pomodoro default bootstrap.
+- Planner and tracker query layer runs through `plannerRepo` + `trackerRepo`, which are genuinely Supabase-backed now (previously they silently fell back to Firestore or per-browser localStorage).
+- Tracker service layer (`timerService`, `ruleEngine`, `suggestionEngine`, `exportService`) is Supabase-first.
+- `trackerRepo.ts` also contains Rule and Reminder CRUD functions.
+- All query files (`src/db/**/queries/**`) use `useSupabaseQuery` + repo functions; `useLiveQuery` and `syncDomainTables` were removed.
+- Cloud sync conflict policy is cloud-first.
+- Preserve local cache ownership logic; a user switch must not mix in the previous owner's data.
+- Any new cloud table design must keep `user_id` and RLS in mind from the start.
+- `PlannerDatabase` and `LifeFlowDB` Dexie schemas are still active; used for cloud bootstrap hydration.
 
-## Hard Kurallar
+## Hard Rules
 
-### Auth ve route kurallari
+### Auth and routing rules
 
-1. `/` public landing olarak kalir.
-2. Protected route'lar auth olmadan render edilmez.
-3. Profil eksikse kullanici protected shell'e birakilmaz; profil akisina gider.
-4. Auth surface'lerde yeni state ekleniyorsa kullaniciya kisa aciklayici metin de verilmelidir; spinner tek basina yeterli degildir.
+1. `/` stays the public landing.
+2. Protected routes never render without auth.
+3. If the profile is incomplete, the user isn't left in the protected shell; they go to the profile flow.
+4. When adding a new state to an auth surface, give the user a short explanatory line too; a spinner alone isn't enough.
 
-### Veri kurallari
+### Data rules
 
-1. `LifeFlowDB` ile `PlannerDatabase` farkini koru; halen cloud bootstrap icin aktif.
-2. Domain query mutation'larinda `plannerRepo` veya `trackerRepo` kullan; direkt Dexie CRUD yazma.
-3. Mutation sonrasi reaktivite icin `invalidateTables([...])` kullan.
-4. Kalici domain verisini Zustand'a tasima.
-5. Sync/import davranisinda cloud-first conflict mantigini degistirme.
-5. Cross-user local cache karismasina yol acacak degisiklik yapma.
+1. Keep the distinction between `LifeFlowDB` and `PlannerDatabase`; both are still active for cloud bootstrap.
+2. Use `plannerRepo` or `trackerRepo` for domain query mutations; don't write directly to Dexie.
+3. Use `invalidateTables([...])` for reactivity after a mutation.
+4. Don't move persistent domain data into Zustand.
+5. Don't change the cloud-first conflict logic in sync/import behavior.
+6. Don't make a change that would cause cross-user local cache mixing.
 
-### UI/UX kurallari
+### UI/UX rules
 
-1. Public landing screenshot kullanmaz; metin + feature card odakli kalir.
-2. OAuth butonlari `rounded-lg` (0.5rem) formunda, esit hiyerarside; sessiz premium fill.
-3. Kart/modal/sidebar arkaplan: sadece monochrome token (`bg-surface-100/200/300`). Accent tintli kart bg yasak.
-4. Icon container'lar: `bg-surface-200 text-text-secondary`. Accent tintli dekoratif icon bg yasak.
-5. Shadow: near-zero — sadece `var(--shadow-card)` (1px ring) veya `var(--shadow-card-elevated)` (2px+8px). `shadow-card-elevated` yalnizca floating panel'larda.
-6. Motion: sayfa gecisi ~180-200ms fade+slide (y:4px), modal giris 0.18s standard easing. Spring/overshoot (`[0.34, 1.56, 0.64, 1]`) yasak. `src/config/motion.ts` merkezi config; `easing.spring` kaldirildi.
+1. Public landing doesn't use screenshots; stays text + feature-card driven.
+2. OAuth buttons are `rounded-lg` (0.5rem), equal hierarchy, quiet premium fill.
+3. Card/modal/sidebar background: monochrome tokens only (`bg-surface-100/200/300`). Accent-tinted card backgrounds are forbidden.
+4. Icon containers: `bg-surface-200 text-text-secondary`. Accent-tinted decorative icon backgrounds are forbidden.
+5. Shadow: near-zero — only `var(--shadow-card)` (1px ring) or `var(--shadow-card-elevated)` (2px+8px). `shadow-card-elevated` only on floating panels.
+6. Motion: page transition ~180-200ms fade+slide (y:4px), modal entry 0.18s standard easing. Spring/overshoot (`[0.34, 1.56, 0.64, 1]`) is forbidden. Central config is `src/config/motion.ts`; `easing.spring` was removed.
 7. H1/H2 weight: 800/700, letter-spacing: -0.03em/-0.025em. Body line-height: 1.6.
-8. `reduced-motion` tum animasyonlarda desteklenir.
-9. Button: `rounded-lg`, active state `scale(0.985)`, hover `-translateY(1px)`.
-10. Onboarding panel: flat border, notr icon/selection card, standard easing.
-11. Public landing, profile setup ve onboarding mobile'da da masaustu kadar kullanilabilir olmalidir.
+8. `reduced-motion` is supported across all animations.
+9. Buttons: `rounded-lg`, active state `scale(0.985)`, hover `-translateY(1px)`.
+10. Onboarding panel: flat border, neutral icon/selection card, standard easing.
+11. Public landing, profile setup, and onboarding must be as usable on mobile as on desktop.
 
-### i18n kurallari
+### i18n rules
 
-1. Tum yeni gorunen metinler i18n uzerinden gider.
-2. `tr` ve `en` locale dosyalari birlikte guncellenir.
-3. Auth/public/onboarding degisikliklerinde `auth` namespace'ini once kontrol edin.
+1. All new user-facing text goes through i18n.
+2. `tr` and `en` locale files are updated together.
+3. Check the `auth` namespace first for auth/public/onboarding changes.
 
-## Onay Gerektiren Degisiklikler
+## Changes That Need Approval
 
-Asagidaki degisikliklerde once kullanici onayi alin:
+Get user confirmation before:
 
-- `src/db/**` altinda schema, migration veya type degisikligi
-- Route yapisinin degismesi
-- Yeni Zustand store eklenmesi veya store kontratinin buyuk oranda degismesi
-- `tailwind.config.js` veya `src/index.css` degisikligi
-- Var olan sayfa bilesenlerinin silinmesi
+- Schema, migration, or type changes under `src/db/**`
+- Changing the route structure
+- Adding a new Zustand store or substantially changing a store's contract
+- Changing `tailwind.config.js` or `src/index.css`
+- Deleting existing page components
 
-## Guncel Route Haritasi
+## Current Route Map
 
 ```text
 /                      -> Public landing
@@ -220,51 +226,51 @@ Asagidaki degisikliklerde once kullanici onayi alin:
 /tracker/goals         -> Goals
 /tracker/activities    -> Activities
 /tracker/categories    -> Categories
+/learn                 -> STEM AI learning workspace
 /settings              -> Settings
 /settings/profile      -> Profile settings
 ```
 
-## Ortam Notlari
+## Environment Notes
 
-- Vite dev server `http://localhost:3000` uzerinden calisir.
-- Supabase callback ve allowed origin ayarlari buna gore hizalanmalidir: `http://localhost:3000/auth/callback`.
-- `VITE_SUPABASE_URL` veya `VITE_SUPABASE_ANON_KEY` eksikse landing acilir, fakat auth aksiyonlari disabled kalir.
-- `VITE_ENABLE_SYNC=true` local-to-cloud bootstrap davranisini acar.
-- `VITE_ENABLE_GOOGLE_AUTH=false` veya `VITE_ENABLE_GITHUB_AUTH=false` ile provider bazli kapatma yapilabilir.
+- Vite dev server runs on `http://localhost:3000`.
+- Supabase callback and allowed-origin settings must match: `http://localhost:3000/auth/callback`.
+- If `VITE_SUPABASE_URL` or `VITE_SUPABASE_ANON_KEY` is missing, the landing page still renders but auth actions are disabled.
+- `VITE_ENABLE_SYNC=true` enables local-to-cloud bootstrap behavior.
+- `VITE_ENABLE_GOOGLE_AUTH=false` or `VITE_ENABLE_GITHUB_AUTH=false` disables a provider.
+- `SUPABASE_SERVICE_ROLE_KEY` is required for `api/chat.ts`, `api/feynman.ts`, and `api/documents/ingest.ts` to write server-side; never expose it with a `VITE_` prefix.
 
-## Test Notlari
+## Testing Notes
 
-- Dexie tabanli testlerde `fake-indexeddb` kullanilir.
-- Test dosyalari `tests/**/*.test.ts(x)` altindadir.
-- Auth akislarinda oncelikli kapsama:
+- Dexie-backed tests use `fake-indexeddb`.
+- Test files live under `tests/**/*.test.ts(x)`.
+- Priority coverage for auth flows:
   - callback -> profile setup -> planner redirect
-  - onboarding fallback davranisi
+  - onboarding fallback behavior
   - profile form validation
-  - provider disabled ve error state'leri
+  - provider disabled and error states
 
-## Calisma Akisi
+## Working Flow
 
-1. Once `TASKS.md` ile hedef urun niyetini oku.
-2. Sonra `src/app/App.tsx`, `src/modules/auth/store/authStore.ts` ve `src/app/providers/CloudDataBootstrap.tsx` ile mevcut gercegi dogrula.
-3. Gorevin bugunku sistemi korumak mi, migration yapmak mi oldugunu ayir.
-4. Dokumanda ve kodda current state ile target state farkini acik tut.
-5. Davranis degisikliginde en az `npm run typecheck` ve ilgili testleri calistir.
+1. Read `TASKS.md` first for target product intent, and `PRODUCT_DIRECTION.md` for the agreed priority order.
+2. Verify current reality against `src/app/App.tsx`, `src/modules/auth/store/authStore.ts`, and `src/app/providers/CloudDataBootstrap.tsx`.
+3. Decide whether the task is maintaining the current system or doing migration work.
+4. Keep the gap between current state and target state explicit in both docs and code.
+5. Run at least `npm run typecheck` and relevant tests on any behavior change.
 
-## Oncelikli Yol Haritasi
+## Priority Roadmap
 
-### 🎯 1. DALGA (Yüksek Öncelikli - Çekirdek Akış ve Canlıya Geçiş)
-1. **DeepSeek Entegrasyonu ve LLM Abstraction (Phase 17):** Tüm API çağrılarını `llmClient.ts` altına çekmek ve Feynman analizi için DeepSeek V4 reasoning modunu entegre etmek.
-2. **RAG pgvector Embedding & Zihin Haritası (Phase 9 & 10):** Ders notu yükleme, chunking, pgvector ve RAG akışını zihin haritası görselleştirmesiyle tamamlamak.
-3. **Production Deploy & Smoke Test (Phase 16):** Canlıya çıkış, RLS denetimi ve OAuth callback doğrulamaları.
+See `PRODUCT_DIRECTION.md` for the current agreed sequencing. Summary:
 
-### 🌟 2. DALGA (Derinleşme ve Adaptasyonlar)
-1. **Gelişmiş Onboarding & Müfredat Tohumlama (Phase 18):** Onboarding ile öğrenci profili çıkarıp prompt enjekte etmek ve hazır EEE, matematik, fizik kavram ağaçlarını tohumlamak.
-2. **Mobil Uyumluluk & PWA (Phase 19):** `/learn` sayfasını responsive yapmak ve PWA service worker ile çevrimdışı flashcard çalışmasını desteklemek.
-3. **İkinci Dalga Modülleri (Phase 12, 13, 14):** CS Sandbox, Sınav Üretici ve INCUP (DEHB) adaptasyonları.
+1. **Solidify the primary core (planner/tracker).** See `feature_quality_report.md` for known concrete issues (modal duplication, a 901-line God Component in `RightPanel.tsx`, dead Zustand modal state, inconsistent folder organization between planner and tracker).
+2. **Build the planner <-> learn integration bridge.** Link `concepts`/`learn_sessions` to `courses`/`units`; add a "study this topic" entry point from a planner unit into `/learn`.
+3. **Focus STEM on one loop.** Socratic chat + mistake analysis + FSRS spaced repetition. Whiteboard, mindmap/React Flow, CS sandbox, exam generator, and INCUP (ADHD) adaptations are deliberately deferred.
 
-## Referanslar
+## References
 
-- `README.md`: kullanici ve contributor odakli genel dokuman
-- `TASKS.md`: hedef SaaS mimarisi ve urun davranisi
-- `CLAUDE.md`: Claude Code odakli gelistirme talimatlari
-- `ARCHITECTURE.md`: sistem bilesenlerinin tam haritasi, veri akisi, klasor sorumluluklari ve nerede ne degistirilmeli rehberi
+- `README.md`: user/contributor-facing overview
+- `TASKS.md`: target SaaS architecture and product behavior
+- `PRODUCT_DIRECTION.md`: agreed priority order and why
+- `CLAUDE.md`: Claude Code-focused development instructions
+- `ARCHITECTURE.md`: full map of system components, data flow, folder responsibilities, and where to change what
+- `feature_quality_report.md`: known tech-debt in the planner/tracker UI layer

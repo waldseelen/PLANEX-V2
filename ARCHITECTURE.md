@@ -1,207 +1,242 @@
-# ARCHITECTURE.md — PLAN.EX & STEMA Sistem İskeleti
+# ARCHITECTURE.md — PLAN.EX V2 & STEMA System Skeleton
 
-Bu dosya, Firebase'den arındırılmış, **Supabase-first** mimariye taşınmış ve üzerine **STEMA** akıllı çalışma alanı entegre edilmiş PLAN.EX projesinin mimari iskeletini ve veri akışını yansıtır.
+This file reflects PLAN.EX's architecture skeleton and data flow after moving
+off Firebase onto a real Supabase backend, with the **STEMA** AI learning
+workspace integrated on top. See `PRODUCT_DIRECTION.md` for why the planner/
+tracker core is being solidified before the STEM/planner integration bridge
+described in section 6 gets built.
 
 ---
 
-## 1. Üst Düzey Sistem Haritası
+## 1. High-Level System Map
 
 ```
 ┌───────────────────────────────────────────────────────────────────────────────────┐
-│                                TARAYICI / İSTEMCİ                                 │
+│                                BROWSER / CLIENT                                   │
 │                                                                                   │
 │  ┌────────────────┐   ┌────────────────────────────────────────────────────────┐  │
 │  │  Public Layer  │   │                Protected App Shell                     │  │
 │  │ (unauthenticated)│  │   AppLayout + Sidebar + Header                         │  │
 │  │                │   │                                                        │  │
 │  │  /             │   │   /planner, /tracker, /habits, /calendar, /settings,   │  │
-│  │  /auth/*       │   │   /learn (Birleşik Sokratik & Feynman Çalışma Alanı)   │  │
+│  │  /auth/*       │   │   /learn (unified Socratic & Feynman workspace)        │  │
 │  │  └────────────────┘   └───────────┬────────────────────────────────────────────┘  │
 │          │                           │                                            │
 │          ▼                           ▼                                            │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐  │
-│  │                       Veri Katmanı (Supabase-First)                         │  │
+│  │                            Data Layer (Hybrid)                              │  │
 │  │                                                                             │  │
-│  │   Primary Writes & Reads: Supabase (Auth, RLS, Domain & STEMA Data)         │  │
-│  │   Local Cache & Hydration: Dexie (Planner / Tracker Offline Cache)          │  │
+│  │   Auth + sync target: Supabase (Auth, RLS, domain & STEMA data)             │  │
+│  │   Primary UI reads/writes today: Dexie (planner/tracker local-first cache) │  │
 │  └─────────────────────────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
+Note: this is honestly a **hybrid** shape, not "Supabase-first" — planner and
+tracker UI components still read/write Dexie directly via `useLiveQuery`;
+Supabase is the sync target that `CloudDataBootstrap` and the repo layer
+(`plannerRepo.ts`/`trackerRepo.ts`) push to and hydrate from. What changed on
+2026-07-05 is that this sync target is now a real Supabase project — before
+that, the "cloud" side silently fell back to Firestore or, when unconfigured,
+per-browser `localStorage`.
+
 ---
 
-## 2. Sistem Bileşenleri
+## 2. System Components
 
-### 2.1 Uygulama Kabuğu (`src/app/`)
+### 2.1 App Shell (`src/app/`)
 
-| Bileşen | Dosya | Sorumluluk |
+| Component | File | Responsibility |
 |---|---|---|
-| Route Ağacı | `App.tsx` | Public ve protected route katmanlarını ayırır. `/learn` rotasını ve alt redirect'leri yönetir. |
-| Authenticated Shell | `layouts/AppLayout.tsx` | Sidebar, header, nav — yalnızca login sonrası. |
-| Auth Bootstrap | `providers/AuthProvider.tsx` | Supabase session'ı sağlar ve yönetir. |
-| Cloud Bootstrap | `providers/CloudDataBootstrap.tsx` | Remote defaults seeding, yerel veriden buluta aktarım promptları ve cache temizliği. |
-| Profil Sync | `providers/ProfilePreferencesSync.tsx` | Tema/locale değişikliğini profile yazar. |
-| Tema Yönetimi | `providers/ThemeProvider.tsx` | CSS custom variables tabanlı dark/light yönetimi. Grayscale estetiğini korur. |
+| Route tree | `App.tsx` | Splits public and protected route layers. Manages the `/learn` route and its sub-redirects. |
+| Authenticated shell | `layouts/AppLayout.tsx` | Sidebar, header, nav — post-login only. |
+| Auth bootstrap | `src/modules/auth/store/authStore.ts` (`ensureInitialAuthBootstrap`) | Resolves the Supabase session before first render. |
+| Cloud bootstrap | `providers/CloudDataBootstrap.tsx` | Remote defaults seeding, local-to-cloud transfer prompts, and cache clearing. |
+| Profile sync | `providers/ProfilePreferencesSync.tsx` | Writes theme/locale changes back to the profile. |
+| Theme management | `providers/ThemeProvider.tsx` | Dark/light management via CSS custom properties. Preserves the grayscale aesthetic. |
 
-### 2.2 Auth Modülü (`src/modules/auth/`)
+### 2.2 Auth Module (`src/modules/auth/`)
 
-| Alt Klasör | Sorumluluk |
+| Subfolder | Responsibility |
 |---|---|
-| `pages/` | `PublicLandingPage` (tek CTA, minimalist), `AuthCallbackPage`, `ProfileCompletionPage`. |
-| `components/` | `AuthGuard`, `ProtectedRoute`, `OAuthButtons` (Google/GitHub), `OnboardingOrchestrator` ve coachmark'lar. |
-| `store/` | `authStore.ts` — session, profil tamamlanma, onboarding adımları ve preference sync. |
-| `lib/` | OAuth yönlendirmeleri, profil yardımcıları, güvenlik şemaları ve telemetri. |
+| `pages/` | `PublicLandingPage` (single CTA, minimalist), `AuthCallbackPage`, `ProfileCompletionPage`. |
+| `components/` | `AuthGuard`, `ProtectedRoute`, `AuthProviderButtons` (Google/GitHub), `OnboardingOrchestrator` and coachmarks. |
+| `store/` | `authStore.ts` — session, profile completion, onboarding steps, and preference sync. Backed by real Supabase Auth (`supabase.auth.signInWithOAuth`/`onAuthStateChange`), not Firebase. |
+| `lib/` | OAuth redirects, profile helpers, security schemas, and telemetry. |
 
-### 2.3 Planner Modülü (`src/modules/planner/`)
+### 2.3 Planner Module (`src/modules/planner/`)
 
-| Alt Klasör | Sorumluluk |
+| Subfolder | Responsibility |
 |---|---|
 | `pages/` | Overview, Courses, CourseDetail, PersonalTasks, Habits, HabitDetail, Calendar, Statistics. |
-| `store/` | `plannerAppStore.ts` (uygulama state'i), `plannerUIStore.ts` (arayüz durumları). |
-| `queries/` | `courseQueries.ts`, `taskQueries.ts` vb. (`useSupabaseQuery` hook'unu kullanan Supabase CRUD katmanı). |
+| `store/` | `plannerAppStore.ts` (app state), `plannerUIStore.ts` (UI state). |
+| `queries/` | `courseQueries.ts`, `taskQueries.ts`, etc. — use `useLiveQuery` against Dexie, backed by `plannerRepo.ts` for the cloud side. |
 
-### 2.4 Tracker Modülü (`src/modules/tracker/`)
+### 2.4 Tracker Module (`src/modules/tracker/`)
 
-| Alt Klasör / Dosya | Sorumluluk |
+| Subfolder / file | Responsibility |
 |---|---|
 | `pages/` | TrackerPage, RecordsPage, StatsPage, GoalsPage, ActivitiesPage, CategoriesPage. |
-| `lib/` | `timerService.ts` (süre başlatma/durdurma), `ruleEngine.ts` (kural kontrolleri), `suggestionEngine.ts` (oturum önerileri), `exportService.ts` (CSV/JSON export). |
-| `queries/` | `activityQueries.ts`, `sessionQueries.ts` vb. (Supabase CRUD katmanı). |
+| `lib/` | `timerService.ts` (start/stop timer), `ruleEngine.ts` (rule checks), `suggestionEngine.ts` (session suggestions), `exportService.ts` (CSV/JSON export). |
+| `queries/` | `activityQueries.ts`, `sessionQueries.ts`, etc. |
 
-### 2.5 STEMA Öğrenme Modülü (`src/modules/learn/`)
+### 2.5 STEMA Learning Module (`src/modules/learn/`)
 
-| Alt Klasör / Dosya | Sorumluluk |
+| Subfolder / file | Responsibility |
 |---|---|
-| `pages/LearnChat.tsx` | **Birleşik Çalışma Alanı (Workspace):** Sol panelde Sokratik, Feynman veya Serbest AI sohbet akışını, sağ panelde ise interaktif Workbench'i barındırır. |
-| `components/Whiteboard.tsx` | **Akıllı Çizim Tuvali:** Hem kullanıcının serbest el/geometrik şekil çizmesini sağlar hem de yapay zekadan gelen plot/grafik komutlarını canvas'a çizer. |
-| `components/LatexRenderer.tsx`| **Custom LaTeX & Markdown Parser:** Satır içi ve blok KaTeX ifadelerini ve temel markdown kurallarını harici ağır bağımlılıklar olmadan render eder. |
-| `lib/fsrs.ts` | **FSRS Kart Zamanlayıcı:** Flashcard'ların bir sonraki görünme tarihini (due_at), kararlılığını (stability) ve zorluğunu hesaplayan SuperMemo tabanlı algoritma. |
+| `pages/LearnChat.tsx` | **Unified workspace:** left panel holds the Socratic, Feynman, or free-mode AI chat stream; right panel holds the interactive Workbench. |
+| `pages/MindmapPage.tsx` | Standalone AI-generated mindmap page (React Flow), saved to the `mindmaps` table. |
+| `components/Whiteboard.tsx` | **Smart drawing canvas:** lets the user free-draw/draw geometric shapes and also renders plot/graph commands sent by the AI. |
+| `components/LatexRenderer.tsx` | **Custom LaTeX & Markdown parser:** renders inline and block KaTeX and basic markdown without heavy external dependencies. |
+| `lib/fsrs.ts` | **FSRS card scheduler:** SuperMemo-based algorithm computing a flashcard's next due date, stability, and difficulty. |
 
-### 2.6 Bulut Katmanı (`src/lib/cloud/`)
+Not yet connected: `concepts` and `learn_sessions` have no `course_id`/
+`unit_id` link back to the planner's `courses`/`units`. This is the concrete
+integration-bridge work described in `PRODUCT_DIRECTION.md`, not yet done.
 
-| Dosya | Sorumluluk |
+### 2.6 Cloud Layer (`src/lib/cloud/`)
+
+| File | Responsibility |
 |---|---|
-| `supabaseRepo.ts` | Alt seviye Supabase CRUD işlemleri, hata yakalama ve connection handling. |
-| `plannerRepo.ts` | Planner alanına özel ders, görev, etkinlik, alışkanlık veri tabanı operasyonları. |
-| `trackerRepo.ts` | Tracker alanına özel süre, kural, kategori ve aktivite veri tabanı operasyonleri. |
-| `queryInvalidation.ts` | Bir tablo güncellendiğinde ilgili queries aboneliklerini uyaran pub/sub cache geçersizleştirici. |
-| `domainSync.ts` | Geriye dönük uyumluluk ve yerel veri tabanını bulut verileriyle besleme (hydration). |
+| `supabaseRepo.ts` | Low-level generic Supabase CRUD (`listOwnedRows`/`upsertOwnedRow`/`updateOwnedRows`/`deleteOwnedRows`) operating on a runtime table name, plus error handling and RLS-aware `user_id` scoping. Replaces the old Firestore-backed `firestoreRepo.ts`. |
+| `plannerRepo.ts` | Course, task, event, and habit database operations specific to the planner domain. |
+| `trackerRepo.ts` | Time session, rule, category, and activity database operations specific to the tracker domain. |
+| `queryInvalidation.ts` | Pub/sub cache invalidator that notifies subscribed queries when a table changes. |
+| `domainSync.ts` | Backward-compat shims and hydrating the local database from cloud data. |
+
+Server-side (`api/lib/supabaseEdge.ts`) is a separate service-role client used
+only by `api/chat.ts`, `api/feynman.ts`, and `api/documents/ingest.ts` — it
+verifies the bearer token against Supabase Auth (`auth.getUser(token)`)
+rather than trusting a client-decoded JWT payload.
 
 ---
 
-## 3. Veri Akışı ve Senkronizasyon
+## 3. Data Flow and Synchronization
 
-### 3.1 Planner / Tracker Veri Akışı (Supabase-First)
+### 3.1 Planner / Tracker Data Flow (Dexie-first, Supabase-synced)
 
-Tüm veri okumaları ve yazmaları reaktif olarak doğrudan Supabase üzerinden yürütülür. Dexie IndexedDB veriyi yerelde önbelleğe alır ancak tek başına yetkili yazma mercii (source-of-truth) değildir.
+UI components read/write Dexie directly through `useLiveQuery`. The repo
+layer (`plannerRepo.ts`/`trackerRepo.ts`, via `supabaseRepo.ts`) is what
+`CloudDataBootstrap` uses to push local data to Supabase and hydrate local
+cache from Supabase — it is not yet the primary path every component reads
+through.
 
 ```
-[React Bileşeni]
-    │ (useSupabaseQuery)
+[React component]
+    │ (useLiveQuery against Dexie)
     ▼
-[queryInvalidation (Pub/Sub Cache)]
-    │ (Tetiklenir / Okunur)
+[Dexie (PlannerDatabase / LifeFlowDB)]
+    ▲
+    │ (hydrate / push, via CloudDataBootstrap)
     ▼
 [plannerRepo / trackerRepo]
-    │ (CRUD İşlemleri)
-    ├────────────────────────┐
-    ▼                        ▼
-[Supabase (Cloud SQL)]   [Dexie (Local Cache)]
+    │ (CRUD via supabaseRepo.ts)
+    ▼
+[Supabase (Cloud Postgres, RLS-protected)]
 ```
 
-### 3.2 STEMA Workbench Entegrasyon Akışı
+### 3.2 STEMA Workbench Integration Flow
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        AI Sohbet Akışı (Chat)                          │
+│                        AI Chat Flow                                    │
 │                                                                        │
-│  Öğrenci sorusu sorar ──► AI modeli (Gemini/DeepSeek) cevabı hazırlar  │
+│  Student asks a question ──► api/chat.ts calls an OpenRouter model    │
 │                                │                                       │
 │                                ▼                                       │
-│          Cevap içinde whiteboard komutları veya JSON varsa             │
-│            (Örn: `[WHITEBOARD_DRAW: {type: "plot", fn: "sin(x)"}]`)    │
+│          If the response contains whiteboard commands                 │
+│            (e.g. `[WHITEBOARD_DRAW: {type: "plot", fn: "sin(x)"}]`)   │
 └────────────────────────────────┬───────────────────────────────────────┘
-                                 │ (Abonelik / Eşleşme)
+                                 │ (parsed client-side)
                                  ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                       STEMA Workbench (Sağ Panel)                      │
+│                       STEMA Workbench (right panel)                    │
 │                                                                        │
-│  ├─ Beyaz Tahta ──► Çizim motoru canvas üzerine grafikleri çizer.      │
-│  ├─ FSRS Tekrar ──► Hatalardan üretilen kartlar veritabanına yazılır.  │
-│  ├─ Notlar/Döküman ──► Supabase `documents` tablosuna aktarım.          │
-│  └─ Kavramlar ──► Güncellenen mastery skorlarını reaktif listeler.    │
+│  ├─ Whiteboard ──► drawing engine renders shapes/plots onto the canvas │
+│  ├─ FSRS review ──► cards generated from mistakes are written to DB    │
+│  ├─ Notes/documents ──► uploaded to Supabase `documents` + storage     │
+│  └─ Concepts ──► reactively lists updated mastery scores               │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 4. Veritabanı Tablo Yapısı
+## 4. Database Table Layout
 
-Supabase üzerinde toplam **18+ domain ve STEMA tablosu** bulunmaktadır. RLS kuralları `auth.uid() = user_id` şartıyla korunmaktadır:
+All tables live in the Supabase project (`supabase/migrations/`) and are
+RLS-protected with `auth.uid() = user_id`.
 
-1.  `profiles`: Kullanıcı kimlik, tercih ve avatar bilgileri.
-2.  `courses` & `units`: Dersler ve ilgili müfredat üniteleri.
-3.  `tasks` & `personal_tasks`: Ders görevleri ve bağımsız kişisel görevler.
-4.  `events`: Takvim etkinlikleri ve FSRS tekrar günleri.
-5.  `habits` & `habit_logs`: Alışkanlık takipleri ve günlük tamamlama kayıtları.
-6.  `activities` & `categories`: Tracker zaman aktiviteleri ve kategorileri.
-7.  `time_sessions` & `running_timers`: Kronometre kayıtları ve aktif sayaçlar.
-8.  `goals`: Zaman hedefleri.
-9.  `reminders`: Sistem içi hatırlatıcılar.
-10. `rules`: Tracker kuralları.
-11. `completion_records`: Tamamlanan etkinlik kayıtları.
-12. `settings` & `pomodoro_configs`: Kullanıcı arayüz tercihleri ve pomodoro süreleri.
-13. `sessions` & `messages`: STEMA sohbet oturumları ve mesaj içerikleri.
-14. `concepts` & `concept_mastery`: Bilişsel STEM konuları ve öğrencinin puanları.
-15. `error_logs`: Yapılan hataların sınıflandırmaları (procedural, conceptual vb.).
-16. `sr_cards`: FSRS tabanlı aralıklı tekrar kartları.
-17. `documents` & `document_chunks`: RAG amaçlı pdf/not dosyaları ve vektörel embedding'ler.
-18. `tutor_events`: Metakognitif davranış takibi için telemetri günlüğü.
+1. `profiles`: user identity, preferences, and avatar info.
+2. `courses` & `units`: courses and their curriculum units.
+3. `tasks` & `personal_tasks`: course-linked tasks and standalone personal tasks.
+4. `events`: calendar events and exams.
+5. `habits` & `habit_logs`: habit tracking and daily completion records.
+6. `categories` & `activities`: tracker time categories and activities.
+7. `time_sessions` & `running_timers`: stopwatch records and active timers.
+8. `goals`: time-based targets.
+9. `reminders`: in-app reminders.
+10. `rules`: tracker automation rules.
+11. `completion_records`: completed-task records.
+12. `settings` & `pomodoro_configs`: user UI preferences and pomodoro durations.
+13. `learn_sessions` & `learn_messages`: STEMA chat sessions and message content.
+14. `concepts` & `concept_mastery`: STEM concept graph and per-student mastery scores. Not yet linked to `courses`/`units` — see section 2.5.
+15. `error_logs`: classification of mistakes made (procedural, conceptual, etc.).
+16. `sr_cards`: FSRS-based spaced-repetition flashcards.
+17. `documents` & `document_chunks`: uploaded study material and pgvector embeddings for RAG.
+18. `mindmaps`: saved AI-generated mindmaps (React Flow nodes/edges).
+19. `tutor_events`: telemetry log for metacognitive behavior tracking.
+
+RAG retrieval uses the `match_document_chunks` Postgres function (pgvector
+cosine similarity), not client-side similarity computation.
 
 ---
 
-## 5. Klasör Sorumlulukları
+## 5. Folder Responsibilities
 
 ```
 src/
-├── app/             → Route yönetimi, ana Layout (AppLayout) ve provider'lar
+├── app/             → Route management, main Layout (AppLayout), and providers
 ├── modules/
-│   ├── auth/        → Giriş ekranı, callback handler, onboarding overlay
-│   ├── planner/     → Ders, takvim, görev ve alışkanlık UI sayfaları
-│   ├── tracker/     → Zamanlayıcı, kronometre, kategoriler ve hedefler
-│   ├── settings/    → Profil ayarları, şifre ve avatar yükleme ekranı
-│   └── learn/       → STEMA Workspace, Whiteboard, LatexRenderer, FSRS kartları
-├── db/              → Dexie Database şemaları ve offline senkronizasyon araçları
+│   ├── auth/        → Login screen, callback handler, onboarding overlay
+│   ├── planner/     → Course, calendar, task, and habit UI pages
+│   ├── tracker/     → Timer, stopwatch, categories, and goals
+│   ├── settings/    → Profile settings, password, and avatar upload screen
+│   └── learn/       → STEMA workspace, Whiteboard, LatexRenderer, FSRS cards
+├── db/              → Dexie database schemas and offline sync helpers
 ├── lib/
-│   ├── cloud/       → plannerRepo, trackerRepo ve cache invalidation altyapısı
-│   └── validation/  → Form ve veri şeması doğrulamaları (Zod)
-├── config/          → Lucide ikon kataloğu, default şablonlar ve Supabase client init
-├── i18n/            → Dil çeviri dosyaları (TR / EN) ve i18next konfigurasyonu
-└── shared/          → useSupabaseQuery, LatexRenderer, modal vb. paylaşılan bileşenler
+│   ├── cloud/       → supabaseRepo, plannerRepo, trackerRepo, and cache invalidation
+│   └── validation/  → Form and data schema validation (Zod)
+├── config/          → Lucide icon catalog, default templates, and Supabase client init
+├── i18n/            → Translation files (TR / EN) and i18next config
+└── shared/          → useSupabaseQuery, LatexRenderer, modal, and other shared components
 ```
 
 ---
 
-## 6. Nerede Ne Değiştirilmeli
+## 6. Where To Change What
 
-*   **Sokratik / Feynman AI davranış kuralları:** `api/chat.ts` veya `api/feynman.ts` içindeki sistem promptları.
-*   **Beyaz tahtaya yeni bir çizim fonksiyonu veya grafik plot türü eklemek:** `src/modules/learn/components/Whiteboard.tsx` içindeki parser ve canvas drawing metodları.
-*   **FSRS algoritma katsayılarını ve öğrenme gecikmelerini düzenlemek:** `src/modules/learn/lib/fsrs.ts`.
-*   **Veritabanı CRUD sorgusu eklemek veya güncellemek:** İlgili domain reposu (`plannerRepo.ts` veya `trackerRepo.ts`).
-*   **UI Tema token'ları veya Notion/Linear stilleri:** `src/index.css` ve `tailwind.config.js`.
-
----
-
-## 7. Çift Katman Durumu
-
-IndexedDB (Dexie) ve Supabase paralel olarak varlığını sürdürmektedir ancak **Supabase yegane veri kaynağıdır.**
-*   Uygulama açılırken veya veri yazılırken `CloudDataBootstrap` ve repo katmanları Supabase'e yazar, Dexie'yi ise sadece hızlı çevrimdışı okumalar ve bootstrap aşamasındaki hydration için günceller.
-*   Kullanıcı internet bağlantısı koptuğunda sistem verileri Dexie'den okuyabilir, ancak yazma işlemlerinde öncelikli hedef bulut API'sidir.
+* **Socratic / Feynman AI behavior rules:** system prompts in `api/chat.ts` or `api/feynman.ts`.
+* **Adding a new whiteboard drawing function or plot type:** the parser and canvas drawing methods in `src/modules/learn/components/Whiteboard.tsx`.
+* **Tuning FSRS algorithm coefficients and learning delays:** `src/modules/learn/lib/fsrs.ts`.
+* **Adding or updating a database CRUD query:** the relevant domain repo (`plannerRepo.ts` or `trackerRepo.ts`).
+* **Linking `concepts`/`learn_sessions` to `courses`/`units` (the pending integration bridge):** add `course_id`/`unit_id` columns via a new migration in `supabase/migrations/`, then wire the planner UI entry point.
+* **UI theme tokens or Notion/Linear-style aesthetics:** `src/index.css` and `tailwind.config.js`.
 
 ---
 
-## 8. Test Stratejisi
+## 7. Dual-Layer Status
 
-*   **Birim ve Bileşen Testleri:** `tests/planner/*.test.ts` ve `tests/tracker/*.test.ts` Vitest ve React Testing Library ile yerel IndexedDB mock'ları (`fake-indexeddb`) eşliğinde çalıştırılır.
-*   **Güvenlik (RLS) Testleri:** `tests/rls/rlsSmoke.test.ts` ile yetkisiz erişim denetimleri yapılır.
-*   **Doğrulama:** Proje genelinde TypeScript derleme doğruluğu (`npm run typecheck`) ve production derlemesi (`npm run build`) ile kod bütünlüğü garanti altına alınır.
+IndexedDB (Dexie) and Supabase both exist in parallel today; **Supabase is
+the sync target and durable source of truth for the cloud side, but Dexie is
+still what most planner/tracker UI reads from directly.**
+* `CloudDataBootstrap` and the repo layer write to Supabase and hydrate Dexie for fast offline reads and bootstrap-time hydration.
+* If the user loses connectivity, the system can still read from Dexie, but the primary write target is the cloud API.
+* Fully collapsing this into a single Supabase-first read path is a `TASKS.md` target, not done yet — see `PRODUCT_DIRECTION.md` step 1 for why this is intentionally sequenced after auditing the current planner/tracker core.
+
+---
+
+## 8. Test Strategy
+
+* **Unit and component tests:** `tests/planner/*.test.ts` and `tests/tracker/*.test.ts` run under Vitest and React Testing Library with local IndexedDB mocks (`fake-indexeddb`).
+* **Security (RLS) tests:** `tests/rls/rlsSmoke.test.ts` checks unauthorized-access behavior.
+* **Verification:** TypeScript compile correctness (`npm run typecheck`) and a production build (`npm run build`) are the project-wide integrity gate.
