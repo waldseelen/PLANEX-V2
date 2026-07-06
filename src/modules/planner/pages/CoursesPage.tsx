@@ -11,7 +11,7 @@ import { Button, IconButton } from '../components/ui/Button'
 import { Card, EmptyState, ProgressBar } from '../components/ui/Card'
 import { PlannerEntityIcon, PlannerIconField, PLANNER_DEFAULT_ICONS } from '../components/ui/PlannerIconField'
 import { Input } from '../components/ui/Input'
-import { Modal } from '../components/ui/Modal'
+import { Modal } from '@/shared/components/Modal'
 import { cn } from '../lib/utils'
 import { COURSE_COLORS } from '../types'
 
