@@ -74,8 +74,8 @@ export function sendNotification(title: string, body?: string, icon?: string): v
 
     new Notification(title, {
         body,
-        icon: icon ?? '/logo.png',
-        badge: '/logo.png',
+        icon: icon ?? '/pwa-192x192.png',
+        badge: '/pwa-192x192.png',
         tag: 'planex-tracker',
     })
 }

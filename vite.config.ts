@@ -89,7 +89,7 @@ const plugins: PluginOption[] = [
     }),
     VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+            includeAssets: ['logo.ico', 'favicon.svg', 'favicon-32x32.png', 'apple-touch-icon.png'],
             manifest: {
                 name: 'PLAN.EX - Akıllı Planlama',
                 short_name: 'PLAN.EX',
