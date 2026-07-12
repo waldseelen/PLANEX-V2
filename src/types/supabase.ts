@@ -178,6 +178,21 @@ export interface Database {
                 Relationships: []
             }
             units: AnyTable
+            course_materials: {
+                Row: {
+                    id: string
+                    user_id: string
+                    course_id: string
+                    file_name: string
+                    mime_type: string
+                    file_size: number
+                    storage_path: string
+                    created_at: string
+                }
+                Insert: { id?: string; user_id: string; course_id: string; file_name: string; mime_type?: string; file_size: number; storage_path: string; created_at?: string }
+                Update: { id?: string; user_id?: string; course_id?: string; file_name?: string; mime_type?: string; file_size?: number; storage_path?: string; created_at?: string }
+                Relationships: []
+            }
             completion_records: AnyTable
             categories: AnyTable
             tags: AnyTable
