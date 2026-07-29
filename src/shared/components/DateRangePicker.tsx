@@ -227,7 +227,7 @@ interface CalendarDropdownProps {
     value: DateRange
     onChange: (range: DateRange) => void
     calendarMonth: DateTime
-    setCalendarMonth: (month: DateTime) => void
+    setCalendarMonth: (month: any) => void
     minDate?: DateTime | undefined
     maxDate?: DateTime | undefined
     weekStartsOn: number

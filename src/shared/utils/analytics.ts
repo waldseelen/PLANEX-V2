@@ -259,7 +259,7 @@ function getNavigationType(): WebVitalsMetric['navigationType'] {
     switch (navEntry.type) {
         case 'reload': return 'reload'
         case 'back_forward': return 'back_forward'
-        case 'prerender': return 'prerender'
+        case 'prerender' as any: return 'prerender'
         default: return 'navigate'
     }
 }

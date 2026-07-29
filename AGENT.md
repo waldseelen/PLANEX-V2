@@ -37,7 +37,7 @@ ANALYZE=true npm run build
 | Type | Public landing + Supabase auth + protected productivity app + STEM AI learning layer |
 | Status | Auth, planner/tracker cloud sync, and the learn/AI backend are now genuinely wired to Supabase (before 2026-07-05 they silently fell back to Firestore/localStorage). Google/GitHub OAuth providers still need to be enabled in the Supabase dashboard. |
 | Last session note (2026-07-05) | Firebase removed entirely (package + code). New Supabase project (`xtkovwztuopzeqpazxur`) created, full schema + RLS applied, authStore/plannerRepo/trackerRepo/api edge functions moved to Supabase, deployed to Vercel (`planex-v2.vercel.app`). |
-| Location | `C:\Users\HP\DEV\STEMA` (folder rename to PLANEX-V2 is still pending — another process was holding a lock on it) |
+| Location | `C:\Users\HP\DEV\PLANEX-V2` (folder renamed from STEMA to match the repo/Vercel project) |
 | Dev server | `http://localhost:3000` |
 | Main stack | React 18, TypeScript 5.7, Vite 6, Tailwind 3, Framer Motion 12, Supabase, Dexie, Zustand |
 

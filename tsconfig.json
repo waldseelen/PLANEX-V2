@@ -23,28 +23,27 @@
         "noUncheckedIndexedAccess": false,
         "exactOptionalPropertyTypes": false,
         "forceConsistentCasingInFileNames": true,
-        "baseUrl": ".",
         "paths": {
             "@/*": [
-                "src/*"
+                "./src/*"
             ],
             "@modules/*": [
-                "src/modules/*"
+                "./src/modules/*"
             ],
             "@shared/*": [
-                "src/shared/*"
+                "./src/shared/*"
             ],
             "@db/*": [
-                "src/db/*"
+                "./src/db/*"
             ],
             "@events/*": [
-                "src/events/*"
+                "./src/events/*"
             ],
             "@infra/*": [
-                "src/infra/*"
+                "./src/infra/*"
             ],
             "@planner/*": [
-                "src/modules/planner/*"
+                "./src/modules/planner/*"
             ]
         }
     },
