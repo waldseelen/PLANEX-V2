@@ -592,3 +592,97 @@ support. **Deliberately deferred** — not started, see `PRODUCT_DIRECTION.md`.
 - [ ] `/learn` works on mobile without layout shift, with smooth transitions between chat and workbench tabs.
 - [ ] The app can be installed as a PWA on phone/desktop.
 - [ ] A flashcard session can be started offline, with ratings stored locally to sync once online.
+
+---
+
+## 🧹 PHASE 20: Documentation-Pass Findings (opened 2026-08-03)
+
+Open items surfaced by the `CLAUDE.template.md` documentation-alignment pass.
+These are **code** items — the documentation side is already done. Evidence and
+line references for each are in `PROGRESS.md` §7 and §7.1. Nothing here was fixed
+in that pass; it was documentation-only under a no-code-change constraint.
+
+- [ ] **20.1: Decide the fate of the stubbed local-cache/bootstrap layer**
+  - [ ] `src/lib/cloud/domainSync.ts` is entirely no-op stubs, yet
+        `src/app/providers/CloudDataBootstrap.tsx` still branches on
+        `getDomainSyncSummary()`. Decide: finish the layer, or delete it and its
+        dead branches. Acceptance: no code path in `CloudDataBootstrap.tsx` is
+        unreachable, and no doc claims a behaviour the code does not perform.
+  - [ ] `src/lib/cloud/localCacheOwner.ts`: `writeLocalCacheOwner` and
+        `readLocalCacheOwner` have zero callers, so the owner value is never
+        written and always reads `null`. Either wire them or remove them together
+        with the two `clearLocalCacheOwner` calls in `authStore.ts` (lines 158, 498).
+  - [ ] Answer the open question explicitly: with no local domain cache remaining,
+        is cross-user cache isolation still a requirement? Record the answer in
+        `ARCHITECTURE.md` §7. Acceptance: the question is answered in the doc, not
+        left implied.
+
+- [ ] **20.2: Rewrite `tests/rls/rlsSmoke.test.ts`**
+  - [ ] The file mocks `@/config/firebase` and `@/lib/cloud/firebaseRepo`, **neither
+        of which exists**, so its Scenario 2 and 3 assertions intercept nothing. Its
+        header comment claims a Supabase→Firebase migration, the reverse of what
+        happened. Rewrite against `@/lib/cloud/supabaseRepo`. Acceptance: removing
+        the mock makes the test fail — i.e. it actually binds to the system under test.
+  - [ ] Only Scenario 1 (unauthenticated rejection) is currently meaningful, because
+        `@/lib/cloud/currentUser` is the one mock that still binds. Preserve that
+        coverage through the rewrite.
+
+- [ ] **20.3: Produce a trustworthy test count**
+  - [ ] Run `npm run test -- --run` in a clean checkout and record the result in
+        `PROGRESS.md` §6 with the command and date. Acceptance: the four
+        contradictory historical counts (343 / 282 / 319 / 321) are superseded by
+        one reproducible number.
+  - [ ] Investigate the 10 network-dependent failures. Hypothesis on record: tests
+        reach the real Supabase client, which `src/config/supabase.ts` points at
+        `https://placeholder.supabase.co` when env vars are absent. Acceptance:
+        confirmed or refuted with output, not inference.
+
+- [ ] **20.4: Fix onboarding step 6's permanently-broken target**
+  - [ ] `OnboardingOrchestrator` step 6 targets `nav-calendar`, but
+        `src/app/components/navItems.ts` has no item with id `calendar` (ids are
+        overview, tasks, habits, tracker, courses, learn, stats, settings), so the
+        step always renders the missing-target fallback in the real app. It is
+        invisible in tests because `tests/auth/authFlow.test.tsx` hand-renders a
+        `data-onboarding-target="nav-calendar"` stub div. Acceptance: the step points
+        at a target that resolves in the running app, or the step is removed and the
+        8-step contract updated in `MEMORY.md`.
+
+- [ ] **20.5: Retire `npm run test:e2e` or give it a config**
+  - [ ] The script runs `playwright test`, `@playwright/test` is installed, but there
+        is no `playwright.config.*` and no spec directory. Acceptance: either a real
+        config plus at least one passing spec, or the script and dependency are
+        removed. A gate with nothing behind it must not stay documented as a gate.
+
+- [ ] **20.6: Clear the lint-suppression backlog**
+  - [ ] Four file-level `eslint-disable` blocks (`src/lib/backup/backupService.ts`,
+        `src/lib/backup/exportService.ts`, `src/lib/cloud/plannerRepo.ts`,
+        `src/lib/cloud/trackerRepo.ts`) and eight inline `eslint-disable-next-line`
+        comments violate `CLAUDE.md` §7.3. Acceptance: `npm run lint` runs to
+        completion with zero suppressions, reported with error and warning counts
+        separately. Do **not** clear this with a bulk `--fix` (§7.5).
+
+- [ ] **20.7: Remove dead dependencies**
+  - [ ] `prop-types` (zero references), `@stripe/stripe-js` (SDK never imported;
+        only env-var price-ID strings in `src/config/plans.ts`), and
+        `@next/bundle-analyzer` (a Next.js package in a Vite repo). Requires approval
+        per `CLAUDE.md` §15. Acceptance: removed, with `npm run build` and
+        `npm run typecheck` clean afterwards.
+  - [ ] Decide whether `src/config/plans.ts`'s `STRIPE_PRICE_IDS` should stay. There
+        is no billing implementation behind it; leaving it implies one exists.
+
+- [ ] **20.8: Remove or implement `VITE_ENABLE_SYNC`**
+  - [ ] The flag exists in `.env.example:36` with zero references in `src/` or
+        `api/`. Acceptance: either it gates real behaviour, or it is deleted from
+        `.env.example`. Docs already record it as dead.
+
+### ✅ CHECK TASK (Phase 20):
+- [ ] No document in the repo asserts a behaviour that the code does not perform.
+- [ ] `npm run test`, `npm run lint`, and `npm run typecheck` each have a real,
+      dated result in `PROGRESS.md` §6 produced by running that exact command.
+- [ ] No test in `tests/` mocks a module the repo does not depend on.
+
+- [ ] **20.9: Remove the dead `CONSTANTS.DB_NAME` entry**
+  - [ ] `src/config/constants.ts:184` defines `DB_NAME: 'LifeFlowDB'` with zero
+        consumers anywhere in `src/`. It is the last textual residue of the removed
+        local database and reads as evidence one still exists. Acceptance: removed,
+        with `npm run typecheck` clean.

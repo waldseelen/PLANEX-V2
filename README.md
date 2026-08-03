@@ -11,7 +11,11 @@ notes) — is integrated at `/learn`.
 See [`PRODUCT_DIRECTION.md`](PRODUCT_DIRECTION.md) for how these two layers
 relate and what's prioritized next.
 
-## Current Status (2026-07-05)
+## Current Status
+
+<!-- Dated status, gate results, and session history live in PROGRESS.md, which
+     owns them. Keep this section to durable orientation only. -->
+
 
 - Public landing at `/`
 - Google and GitHub OAuth login, backed by real Supabase Auth
@@ -25,21 +29,20 @@ relate and what's prioritized next.
 
 Important:
 
-- `TASKS.md` describes the target architecture where domain data moves fully onto Supabase.
-- The codebase hasn't fully reached that yet — planner/tracker UI still reads/writes Dexie directly, with Supabase as the sync target (see `ARCHITECTURE.md` section 7).
+- `TASKS.md` describes a target architecture and predates two backend migrations; cross-check its "done" marks against the code.
+- Domain data now runs entirely on Supabase. There is no Dexie/IndexedDB layer. What is still unfinished is the local-cache bootstrap layer, whose stubs make parts of `CloudDataBootstrap` unreachable (see `ARCHITECTURE.md` section 7).
 - What changed on 2026-07-05: that sync target, and all of `/learn`'s backend, are now genuinely Supabase — previously they silently ran on Firebase, or fell back to per-browser `localStorage` when Firebase wasn't configured (which it never was in production). Firebase has been removed entirely from the codebase.
 - Google/GitHub OAuth providers and `SUPABASE_SERVICE_ROLE_KEY` still need to be configured in the Supabase dashboard / Vercel project for the deployed app to fully work end-to-end.
 
 ## Tech Stack
 
-- React 18
-- TypeScript 5.7
-- Vite 6
-- Tailwind CSS 3
+- React 19
+- TypeScript 7
+- Vite 8
+- Tailwind CSS 4
 - Framer Motion 12
 - Supabase Auth / Database / Storage (with pgvector for RAG)
-- Dexie + IndexedDB
-- Zustand
+- Zustand (UI state only — domain data lives in Supabase)
 - Vercel Edge Functions (`api/*`) for the AI/learn backend, via OpenRouter
 - Vitest
 - Playwright
@@ -56,10 +59,9 @@ Important:
 
 ### Domain data layer
 
-- Planner and tracker modules still run primarily through Dexie local databases (`useLiveQuery`).
-- `PlannerDatabase` backs planner data.
-- `LifeFlowDB` backs tracker data.
-- `CloudDataBootstrap` handles moving local data to the cloud or hydrating local cache from the cloud once Supabase is active and the profile is complete.
+- Planner and tracker modules read through the `useSupabaseQuery` hook and mutate through `plannerRepo` / `trackerRepo`, which talk to Supabase via `supabaseRepo.ts`.
+- There is no local domain database. `src/db/` is a legacy folder name holding domain types and Supabase-backed query modules; its `database.ts` files are empty stubs.
+- `CloudDataBootstrap` seeds remote defaults for a newly authenticated user. Its local-data import and cache-clear paths are currently unreachable — see `ARCHITECTURE.md` section 7.
 - Conflict policy is cloud-first.
 
 ### Learn / STEM AI data layer
@@ -128,7 +130,7 @@ Notes:
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes (for `/learn`) | Server-side key for `api/chat.ts`/`api/feynman.ts`/`api/documents/ingest.ts`; never expose with a `VITE_` prefix |
 | `OPENROUTER_API_KEY` | Yes (for `/learn`) | Model calls for Socratic chat, Feynman, mindmap, and OCR |
 | `VITE_ALLOWED_AUTH_ORIGINS` | Recommended | OAuth callback origin allowlist |
-| `VITE_ENABLE_SYNC` | Optional | Enables local-to-cloud bootstrap and sync flow |
+| `VITE_ENABLE_SYNC` | Unused | Present in `.env.example` but referenced nowhere in `src/` or `api/`. Setting it has no effect. |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Optional | Future payment surfaces |
 | `VITE_ENABLE_GOOGLE_AUTH` | Optional | Set `false` to disable the Google provider |
 | `VITE_ENABLE_GITHUB_AUTH` | Optional | Set `false` to disable the GitHub provider |
@@ -159,7 +161,6 @@ Notes:
 | `/planner/courses/:courseId` | Course detail |
 | `/planner/tasks` | Personal tasks |
 | `/planner/statistics` | Planner statistics |
-| `/calendar` | Calendar |
 | `/habits` | Habits dashboard |
 | `/habits/:habitId` | Habit detail |
 | `/tracker` | Tracker home |
@@ -172,8 +173,9 @@ Notes:
 | `/settings` | General settings |
 | `/settings/profile` | Profile settings |
 
-Legacy redirects:
+Legacy redirects (not pages):
 
+- `/calendar` -> `/planner/tasks` — calendar is a view tab inside the planner tasks page, not its own route
 - `/tasks` -> `/planner/tasks`
 - `/statistics` -> `/planner/statistics`
 
@@ -188,7 +190,7 @@ src/
 │   ├── tracker/         # Time tracking module
 │   ├── learn/           # STEM AI learning workspace
 │   └── settings/        # Settings + profile settings
-├── db/                  # Dexie-based local data layer
+├── db/                  # Domain types + Supabase-backed query modules (legacy name)
 ├── lib/cloud/           # Supabase-backed repo layer (supabaseRepo, plannerRepo, trackerRepo)
 ├── i18n/                # TR / EN locale files
 ├── shared/              # Shared components, hooks, utils

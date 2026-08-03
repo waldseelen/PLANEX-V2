@@ -5,7 +5,12 @@ This report is concrete evidence for `PRODUCT_DIRECTION.md` step 1
 issues to work through before moving on to the STEM/planner integration
 bridge or any new STEM features.
 
-## Status (2026-07-06)
+> **Scope note.** This file records dated *observations* of tech debt, not current
+> status. The test counts quoted below ("319 passing", "321 passing") are what was
+> observed on 2026-07-06 and are **not** the current test gate. `PROGRESS.md` §6
+> owns the current figure and supersedes both — see `CLAUDE.md` §3.
+
+## Status (observed 2026-07-06)
 
 Items 2 and 3 below are resolved, via
 [PR #1](https://github.com/waldseelen/PLANEX-V2/pull/1) (merged

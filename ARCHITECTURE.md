@@ -18,27 +18,30 @@ described in section 6 gets built.
 │  │  Public Layer  │   │                Protected App Shell                     │  │
 │  │ (unauthenticated)│  │   AppLayout + Sidebar + Header                         │  │
 │  │                │   │                                                        │  │
-│  │  /             │   │   /planner, /tracker, /habits, /calendar, /settings,   │  │
+│  │  /             │   │   /planner, /tracker, /habits, /settings,              │  │
 │  │  /auth/*       │   │   /learn (unified Socratic & Feynman workspace)        │  │
 │  │  └────────────────┘   └───────────┬────────────────────────────────────────────┘  │
 │          │                           │                                            │
 │          ▼                           ▼                                            │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐  │
-│  │                            Data Layer (Hybrid)                              │  │
+│  │                            Data Layer                                       │  │
 │  │                                                                             │  │
-│  │   Auth + sync target: Supabase (Auth, RLS, domain & STEMA data)             │  │
-│  │   Primary UI reads/writes today: Dexie (planner/tracker local-first cache) │  │
+│  │   Single persistence path: Supabase (Auth, RLS, domain & STEMA data)        │  │
+│  │   Reached through useSupabaseQuery + plannerRepo/trackerRepo                │  │
 │  └─────────────────────────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-Note: this is honestly a **hybrid** shape, not "Supabase-first" — planner and
-tracker UI components still read/write Dexie directly via `useLiveQuery`;
-Supabase is the sync target that `CloudDataBootstrap` and the repo layer
-(`plannerRepo.ts`/`trackerRepo.ts`) push to and hydrate from. What changed on
-2026-07-05 is that this sync target is now a real Supabase project — before
-that, the "cloud" side silently fell back to Firestore or, when unconfigured,
-per-browser `localStorage`.
+Note: this is a **single-path** shape. Earlier revisions of this document
+described a "Dexie-first hybrid"; that is no longer true and the framing has been
+removed. `dexie` is not a dependency, `PlannerDatabase`/`LifeFlowDB` do not exist
+as classes, and the `database.ts` files under `src/db/` are empty stubs. Every
+planner and tracker read goes through `useSupabaseQuery` plus a repo function.
+
+What *is* still incomplete is the local-cache/bootstrap layer:
+`src/lib/cloud/domainSync.ts` is a set of no-op stubs whose callers in
+`CloudDataBootstrap.tsx` still branch on them, which makes several bootstrap
+paths unreachable. See `CLAUDE.md` §1 and `MEMORY.md`.
 
 ---
 
@@ -51,9 +54,40 @@ per-browser `localStorage`.
 | Route tree | `App.tsx` | Splits public and protected route layers. Manages the `/learn` route and its sub-redirects. |
 | Authenticated shell | `layouts/AppLayout.tsx` | Sidebar, header, nav — post-login only. |
 | Auth bootstrap | `src/modules/auth/store/authStore.ts` (`ensureInitialAuthBootstrap`) | Resolves the Supabase session before first render. |
-| Cloud bootstrap | `providers/CloudDataBootstrap.tsx` | Remote defaults seeding, local-to-cloud transfer prompts, and cache clearing. |
+| Cloud bootstrap | `providers/CloudDataBootstrap.tsx` | Seeds remote defaults. Its local-to-cloud prompt and cache-clear branches are currently unreachable — see §7. |
 | Profile sync | `providers/ProfilePreferencesSync.tsx` | Writes theme/locale changes back to the profile. |
 | Theme management | `providers/ThemeProvider.tsx` | Dark/light management via CSS custom properties. Preserves the grayscale aesthetic. |
+
+#### Route map (`src/app/App.tsx`)
+
+This table is the owner of the route list; do not restate it in `CLAUDE.md`,
+`AGENT.md`, or `README.md`.
+
+| Path | Renders |
+|---|---|
+| `/` | Public landing (the only unauthenticated surface) |
+| `/auth/callback` | OAuth callback handler |
+| `/auth/profile-completion` | Canonical profile completion |
+| `/auth/profile-setup` | Legacy compatibility alias |
+| `/planner` | Planner dashboard |
+| `/planner/courses`, `/planner/courses/:courseId` | Courses, course detail |
+| `/planner/tasks` | Personal tasks — **also hosts the calendar view tab** |
+| `/planner/statistics` | Planner statistics |
+| `/habits`, `/habits/:habitId` | Habits dashboard, habit detail |
+| `/tracker` | Tracker |
+| `/tracker/records`, `/stats`, `/goals`, `/activities`, `/categories` | Tracker sub-pages |
+| `/learn` | Unified STEMA workspace (Socratic chat, Feynman, FSRS, whiteboard) |
+| `/learn/map` | Mindmap workspace |
+| `/settings`, `/settings/profile` | Settings, profile settings |
+
+Redirects (not pages): `/calendar` → `/planner/tasks`, `/tasks` →
+`/planner/tasks`, `/statistics` → `/planner/statistics`, `/learn/chat` and
+`/learn/flashcards` → `/learn`, `/learn/feynman` → `/learn?mode=feynman`, and a
+catch-all `*` → `/`.
+
+**`/calendar` is no longer a calendar page** — it is a `<Navigate>` redirect.
+Calendar is a view tab inside the planner tasks page. Several documents listed it
+as a real route.
 
 ### 2.2 Auth Module (`src/modules/auth/`)
 
@@ -70,7 +104,7 @@ per-browser `localStorage`.
 |---|---|
 | `pages/` | Overview, Courses, CourseDetail, PersonalTasks, Habits, HabitDetail, Calendar, Statistics. |
 | `store/` | `plannerAppStore.ts` (app state), `plannerUIStore.ts` (UI state). |
-| `queries/` | `courseQueries.ts`, `taskQueries.ts`, etc. — use `useLiveQuery` against Dexie, backed by `plannerRepo.ts` for the cloud side. |
+| `queries/` | `courseQueries.ts`, `taskQueries.ts`, etc. — use `useSupabaseQuery` plus `plannerRepo.ts` functions. |
 
 ### 2.4 Tracker Module (`src/modules/tracker/`)
 
@@ -113,21 +147,20 @@ rather than trusting a client-decoded JWT payload.
 
 ## 3. Data Flow and Synchronization
 
-### 3.1 Planner / Tracker Data Flow (Dexie-first, Supabase-synced)
+### 3.1 Planner / Tracker Data Flow (Supabase, single path)
 
-UI components read/write Dexie directly through `useLiveQuery`. The repo
-layer (`plannerRepo.ts`/`trackerRepo.ts`, via `supabaseRepo.ts`) is what
-`CloudDataBootstrap` uses to push local data to Supabase and hydrate local
-cache from Supabase — it is not yet the primary path every component reads
-through.
+UI components read through the `useSupabaseQuery` hook and mutate through the
+repo layer (`plannerRepo.ts`/`trackerRepo.ts`, via `supabaseRepo.ts`). There is
+no local domain database in between. `useSupabaseQuery` caches results and does
+**not** auto-revalidate — a mutation must call `invalidateTables([...])`
+(`src/lib/cloud/queryInvalidation.ts`) or the UI keeps showing stale rows.
 
 ```
 [React component]
-    │ (useLiveQuery against Dexie)
+    │ (useSupabaseQuery — cached, invalidation-driven)
     ▼
-[Dexie (PlannerDatabase / LifeFlowDB)]
-    ▲
-    │ (hydrate / push, via CloudDataBootstrap)
+[src/db/*/queries/*.ts]
+    │
     ▼
 [plannerRepo / trackerRepo]
     │ (CRUD via supabaseRepo.ts)
@@ -202,7 +235,8 @@ src/
 │   ├── tracker/     → Timer, stopwatch, categories, and goals
 │   ├── settings/    → Profile settings, password, and avatar upload screen
 │   └── learn/       → STEMA workspace, Whiteboard, LatexRenderer, FSRS cards
-├── db/              → Dexie database schemas and offline sync helpers
+├── db/              → Domain types + Supabase-backed query modules (legacy folder
+│                      name; the `database.ts` files here are empty stubs)
 ├── lib/
 │   ├── cloud/       → supabaseRepo, plannerRepo, trackerRepo, and cache invalidation
 │   └── validation/  → Form and data schema validation (Zod)
@@ -224,19 +258,34 @@ src/
 
 ---
 
-## 7. Dual-Layer Status
+## 7. Persistence Status
 
-IndexedDB (Dexie) and Supabase both exist in parallel today; **Supabase is
-the sync target and durable source of truth for the cloud side, but Dexie is
-still what most planner/tracker UI reads from directly.**
-* `CloudDataBootstrap` and the repo layer write to Supabase and hydrate Dexie for fast offline reads and bootstrap-time hydration.
-* If the user loses connectivity, the system can still read from Dexie, but the primary write target is the cloud API.
-* Fully collapsing this into a single Supabase-first read path is a `TASKS.md` target, not done yet — see `PRODUCT_DIRECTION.md` step 1 for why this is intentionally sequenced after auditing the current planner/tracker core.
+**Supabase is the single source of truth and the single read path.** There is no
+IndexedDB/Dexie layer in parallel with it — that framing described an earlier
+architecture and is no longer accurate.
+
+What remains unfinished is the *bootstrap* layer, not the read path:
+
+* `src/lib/cloud/domainSync.ts` exports `getDomainSyncSummary`,
+  `clearLocalDomainCaches`, `hydrateLocalCacheFromCloud`, and
+  `migrateLocalDataToCloud` — **all no-op stubs**. `getDomainSyncSummary()`
+  unconditionally reports no cloud data, no local data, and no owner mismatch.
+* `src/app/providers/CloudDataBootstrap.tsx` still branches on that summary, so
+  its owner-mismatch cache-clear branch and its local-data import prompt are
+  **unreachable at runtime**; only `ensureRemoteUserDefaults()` executes.
+* `src/lib/cloud/localCacheOwner.ts` is half-wired: `clearLocalCacheOwner` has
+  two callers in `authStore.ts`, while `writeLocalCacheOwner` and
+  `readLocalCacheOwner` have none.
+
+Whether this layer should be finished or deleted outright is an open question —
+with no local domain cache left, there may be nothing for it to isolate. It is
+recorded as open work in `TASKS.md` and must not be described as active
+protection.
 
 ---
 
 ## 8. Test Strategy
 
-* **Unit and component tests:** `tests/planner/*.test.ts` and `tests/tracker/*.test.ts` run under Vitest and React Testing Library with local IndexedDB mocks (`fake-indexeddb`).
+* **Unit and component tests:** `tests/planner/*.test.ts` and `tests/tracker/*.test.ts` run under Vitest and React Testing Library. `fake-indexeddb/auto` in `tests/setup.ts` polyfills the browser IndexedDB API for jsdom — it is a jsdom shim, not evidence of a Dexie layer.
 * **Security (RLS) tests:** `tests/rls/rlsSmoke.test.ts` checks unauthorized-access behavior.
 * **Verification:** TypeScript compile correctness (`npm run typecheck`) and a production build (`npm run build`) are the project-wide integrity gate.
